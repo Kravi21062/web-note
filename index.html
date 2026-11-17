@@ -1,0 +1,2529 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Keep Clean-Room Studio — Local-First Masonry Notes & Lists</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+    .masonry-stage {
+      position: relative;
+      width: 100%;
+      transition: height 180ms ease;
+    }
+    .masonry-card {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: transform 220ms cubic-bezier(0.2, 0, 0, 1), box-shadow 150ms ease, border-color 150ms ease, background-color 180ms ease;
+      will-change: transform;
+    }
+    .masonry-card.dragging {
+      opacity: 0.55;
+      z-index: 30;
+    }
+    .card-actions {
+      opacity: 0;
+      transition: opacity 140ms ease;
+    }
+    .masonry-card:hover .card-actions,
+    .masonry-card.selected .card-actions,
+    .masonry-card:focus-within .card-actions {
+      opacity: 1;
+    }
+    .select-check {
+      opacity: 0;
+      transform: scale(0.85);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+    .masonry-card:hover .select-check,
+    .masonry-card.selected .select-check {
+      opacity: 1;
+      transform: scale(1);
+    }
+    @media (max-width: 768px) {
+      .card-actions, .select-check {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+    .modal-enter {
+      animation: modalPop 200ms cubic-bezier(0.2, 0, 0, 1) forwards;
+    }
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(0.92) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.55); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-[#202124] dark:text-[#e8eaed] min-h-screen flex flex-col selection:bg-amber-400/30">
+
+  <!-- TOP APP BAR / BATCH SELECTION BAR -->
+  <header id="top-app-bar" class="sticky top-0 z-30 h-16 border-b border-slate-200/80 dark:border-[#3c4043] bg-white/95 dark:bg-[#202124]/95 backdrop-blur px-3 sm:px-5 flex items-center justify-between gap-2 transition-colors">
+    <!-- Normal Header Mode -->
+    <div id="header-normal" class="w-full flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <button id="btn-toggle-sidebar" type="button" title="Toggle Navigation Sidebar" class="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="flex items-center gap-2.5 cursor-pointer" id="brand-home-trigger">
+          <div class="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center text-slate-950 shadow-sm">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 21h6m-6-3h6m-3-15a6 6 0 00-4.5 9.96c.62.7 1.15 1.52 1.38 2.44h6.24c.23-.92.76-1.74 1.38-2.44A6 6 0 0012 3z"/></svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span id="header-view-title" class="font-semibold text-base sm:text-lg tracking-tight">Keep Studio</span>
+              <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/30">REA Clean-Room</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Input Bar -->
+      <div class="flex-1 max-w-2xl mx-1 sm:mx-4 relative">
+        <div class="relative flex items-center">
+          <svg class="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <input id="search-input" type="text" placeholder="Search notes, checklists, #labels, or OCR text... (Press /)" class="w-full pl-10 pr-20 py-2.5 rounded-xl bg-slate-100 dark:bg-[#28292c] border border-transparent focus:border-amber-400/70 focus:bg-white dark:focus:bg-[#303134] text-sm outline-none transition" />
+          <div class="absolute right-2 flex items-center gap-1">
+            <button id="btn-toggle-filters" type="button" title="Toggle Search Facets" class="px-2 py-1 text-xs rounded-lg hover:bg-slate-200 dark:hover:bg-[#3c4043] text-slate-500 dark:text-slate-300 font-medium transition">Filters</button>
+            <button id="btn-clear-search" type="button" title="Clear Search" class="hidden p-1 rounded-full hover:bg-slate-200 dark:hover:bg-[#3c4043] text-slate-500 dark:text-slate-300">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Multi-Faceted Filter Popover -->
+        <div id="search-facet-panel" class="hidden absolute left-0 right-0 mt-2 p-4 rounded-2xl bg-white dark:bg-[#28292c] shadow-2xl border border-slate-200 dark:border-[#3c4043] z-40 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Filter by Type</span>
+            <button id="btn-reset-facets" type="button" class="text-xs text-amber-500 hover:underline font-medium">Reset all filters</button>
+          </div>
+          <div id="facet-type-buttons" class="flex flex-wrap gap-1.5">
+            <button type="button" data-facet-type="ALL" class="facet-type-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-400 text-slate-950">All Notes</button>
+            <button type="button" data-facet-type="LISTS" class="facet-type-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#35363a] hover:bg-slate-200">Checklists</button>
+            <button type="button" data-facet-type="REMINDERS" class="facet-type-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#35363a] hover:bg-slate-200">Reminders</button>
+            <button type="button" data-facet-type="DRAWINGS" class="facet-type-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#35363a] hover:bg-slate-200">Drawings & Media</button>
+          </div>
+          <div>
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Filter by Color</span>
+            <div id="facet-color-swatches" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Action Controls -->
+      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div id="sync-status-badge" class="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mr-1" title="IndexedDB Local-First Sync Active">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sync-status-text">Synced</span>
+        </div>
+
+        <button id="btn-toggle-rea-inspector" type="button" title="Toggle REA Architecture & Masonry Telemetry" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium bg-slate-100 dark:bg-[#303134] hover:bg-amber-400/20 text-slate-700 dark:text-amber-300 border border-slate-200 dark:border-[#3c4043] transition">
+          REA Telemetry
+        </button>
+
+        <button id="btn-toggle-layout" type="button" title="Switch Masonry Grid / Single-Column List View" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300 transition">
+          <svg id="icon-layout-grid" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+
+        <button id="btn-toggle-theme" type="button" title="Toggle Dark / Light Theme" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300 transition">
+          <svg id="icon-theme-sun" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-6.364l-1.414 1.414M7.05 16.95l-1.414 1.414m12.728 0l-1.414-1.414M7.05 7.05L5.636 5.636M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        </button>
+
+        <button id="btn-open-export-modal" type="button" title="Export / Import Vault (JSON & Markdown)" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Batch Selection Mode Bar -->
+    <div id="header-batch" class="hidden w-full items-center justify-between gap-3 bg-amber-500/10 dark:bg-[#303134] px-3 py-2 rounded-xl border border-amber-400/40">
+      <div class="flex items-center gap-3">
+        <button id="btn-batch-clear" type="button" class="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-[#3c4043]" title="Cancel Selection (Esc)">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <span id="batch-count-label" class="font-semibold text-sm">1 selected</span>
+        <button id="btn-batch-select-all" type="button" class="text-xs font-medium text-amber-600 dark:text-amber-300 hover:underline">Select all visible</button>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-batch-pin" type="button" title="Toggle Pin Selected" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#202124] hover:bg-slate-100 border border-slate-200 dark:border-[#3c4043]">Pin / Unpin</button>
+        <button id="btn-batch-archive" type="button" title="Archive Selected (e)" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white dark:bg-[#202124] hover:bg-slate-100 border border-slate-200 dark:border-[#3c4043]">Archive</button>
+        <button id="btn-batch-trash" type="button" title="Move Selected to Trash (#)" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30 hover:bg-rose-500/25">Delete</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE BODY -->
+  <div class="flex-1 flex relative">
+    <!-- Left Navigation Sidebar -->
+    <aside id="sidebar-nav" class="w-64 shrink-0 border-r border-slate-200/70 dark:border-[#3c4043]/70 bg-white/60 dark:bg-[#202124] py-3 px-2 flex flex-col justify-between transition-all duration-200 select-none">
+      <div class="space-y-1">
+        <button type="button" data-nav="NOTES" class="nav-item w-full flex items-center justify-between px-4 py-2.5 rounded-r-full text-sm font-medium transition">
+          <span class="flex items-center gap-3">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 21h6m-6-3h6m-3-15a6 6 0 00-4.5 9.96c.62.7 1.15 1.52 1.38 2.44h6.24c.23-.92.76-1.74 1.38-2.44A6 6 0 0012 3z"/></svg>
+            <span class="nav-label">Notes</span>
+          </span>
+          <span id="nav-count-notes" class="text-xs font-mono opacity-75">0</span>
+        </button>
+
+        <button type="button" data-nav="REMINDERS" class="nav-item w-full flex items-center justify-between px-4 py-2.5 rounded-r-full text-sm font-medium transition">
+          <span class="flex items-center gap-3">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            <span class="nav-label">Reminders</span>
+          </span>
+          <span id="nav-count-reminders" class="text-xs font-mono opacity-75">0</span>
+        </button>
+
+        <!-- Dynamic Labels List -->
+        <div class="pt-3 pb-1 px-4 flex items-center justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Labels</span>
+          <button id="btn-open-label-manager" type="button" class="text-xs text-amber-500 hover:underline font-medium">Edit</button>
+        </div>
+        <div id="sidebar-labels-container" class="space-y-0.5"></div>
+
+        <div class="pt-3">
+          <button type="button" data-nav="ARCHIVE" class="nav-item w-full flex items-center justify-between px-4 py-2.5 rounded-r-full text-sm font-medium transition">
+            <span class="flex items-center gap-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+              <span class="nav-label">Archive</span>
+            </span>
+            <span id="nav-count-archive" class="text-xs font-mono opacity-75">0</span>
+          </button>
+
+          <button type="button" data-nav="TRASH" class="nav-item w-full flex items-center justify-between px-4 py-2.5 rounded-r-full text-sm font-medium transition">
+            <span class="flex items-center gap-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <span class="nav-label">Trash</span>
+            </span>
+            <span id="nav-count-trash" class="text-xs font-mono opacity-75">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Keyboard Shortcuts Legend -->
+      <div class="mt-6 mx-2 p-3 rounded-xl bg-slate-100 dark:bg-[#28292c] text-xs space-y-1.5 border border-slate-200/70 dark:border-[#3c4043]">
+        <div class="font-semibold text-slate-600 dark:text-slate-300 flex items-center justify-between">
+          <span>Shortcuts</span>
+          <span class="font-mono text-[10px] text-amber-500">TopLevelNode</span>
+        </div>
+        <div class="flex justify-between text-slate-500 dark:text-slate-400"><span>New Note</span><kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-[#202124] font-mono text-[11px]">c</kbd></div>
+        <div class="flex justify-between text-slate-500 dark:text-slate-400"><span>New Checklist</span><kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-[#202124] font-mono text-[11px]">l</kbd></div>
+        <div class="flex justify-between text-slate-500 dark:text-slate-400"><span>Search Filter</span><kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-[#202124] font-mono text-[11px]">/</kbd></div>
+        <div class="flex justify-between text-slate-500 dark:text-slate-400"><span>Drawing Pad</span><kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-[#202124] font-mono text-[11px]">d</kbd></div>
+      </div>
+    </aside>
+
+    <!-- Main Board Content -->
+    <main class="flex-1 px-3 sm:px-6 md:px-10 py-6 max-w-7xl mx-auto w-full">
+
+      <!-- REA Live Architecture & Telemetry Drawer (Hidden by default) -->
+      <section id="rea-inspector-drawer" class="hidden mb-6 p-4 rounded-2xl bg-slate-900 text-slate-100 border border-amber-500/40 shadow-xl space-y-3 font-mono text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 font-bold">REA-ARCHITECT TELEMETRY</span>
+            <span class="text-slate-400">Live Masonry Bin-Packing & Node-Tree State</span>
+          </div>
+          <span id="rea-telemetry-summary" class="text-emerald-400">Columns: 0 | Active Nodes: 0</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+            <div class="text-amber-400 font-semibold mb-1">1. Masonry Column Accumulator H[c]</div>
+            <div id="rea-col-vectors" class="text-slate-300 break-all">Pinned: [] | Others: []</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+            <div class="text-amber-400 font-semibold mb-1">2. Storage & Sync Engine</div>
+            <div id="rea-storage-metrics" class="text-slate-300">IndexedDB + LocalStorage Mirror</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+            <div class="text-amber-400 font-semibold mb-1">3. Last Delta Mutation</div>
+            <div id="rea-last-mutation" class="text-slate-300 truncate">INIT_HYDRATE</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trash Banner (Shown only in Trash view) -->
+      <div id="trash-view-banner" class="hidden mb-6 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3">
+        <span class="text-sm text-rose-700 dark:text-rose-200">Notes in Trash are soft-deleted (`trashed: true`). You can restore them or permanently purge the Trash.</span>
+        <button id="btn-empty-trash" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-500 shrink-0 transition">Empty Trash now</button>
+      </div>
+
+      <!-- QUICK-CAPTURE COMPOSER BAR -->
+      <section id="quick-capture-wrapper" class="max-w-xl mx-auto mb-8">
+        <div id="quick-capture-card" class="rounded-2xl border border-slate-200/90 dark:border-[#5f6368] bg-white dark:bg-[#202124] shadow-md transition-colors overflow-hidden">
+          <!-- Collapsed Prompt Row -->
+          <div id="composer-collapsed" class="flex items-center justify-between px-4 py-3 cursor-text">
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400 select-none">Take a note... (Press 'c' or click)</span>
+            <div class="flex items-center gap-1">
+              <button id="btn-quick-list" type="button" title="New Checklist (l)" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              </button>
+              <button id="btn-quick-drawing" type="button" title="New Freehand Drawing Note (d)" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+              <button id="btn-quick-image" type="button" title="New Image Note" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#303134] text-slate-600 dark:text-slate-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Expanded Composer Form -->
+          <div id="composer-expanded" class="hidden p-4 space-y-3">
+            <!-- Composer Attachment Previews -->
+            <div id="composer-attachments" class="grid grid-cols-2 gap-2 empty:hidden"></div>
+
+            <!-- Title + Pin Row -->
+            <div class="flex items-start justify-between gap-2">
+              <input id="composer-title" type="text" placeholder="Title" class="w-full bg-transparent font-semibold text-base outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500" />
+              <button id="composer-pin-btn" type="button" title="Pin note" class="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-500 dark:text-slate-300 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+              </button>
+            </div>
+
+            <!-- Polymorphic Body: Plain Text Mode -->
+            <textarea id="composer-text" rows="3" placeholder="Take a note..." class="w-full bg-transparent text-sm outline-none resize-none placeholder:text-slate-400 dark:placeholder:text-slate-500 leading-relaxed"></textarea>
+
+            <!-- Polymorphic Body: Checklist Mode -->
+            <div id="composer-list-container" class="hidden space-y-1.5">
+              <div id="composer-list-items" class="space-y-1.5"></div>
+              <div class="flex items-center gap-2 pt-1 border-t border-black/10 dark:border-white/10">
+                <span class="text-slate-400 text-lg leading-none">+</span>
+                <input id="composer-new-item-input" type="text" placeholder="List item (Press Enter to add)" class="w-full bg-transparent text-sm outline-none py-1" />
+              </div>
+            </div>
+
+            <!-- Composer Active Badges (Labels + Reminder) -->
+            <div id="composer-badges" class="flex flex-wrap gap-1.5 pt-1 empty:hidden"></div>
+
+            <!-- Composer Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-black/5 dark:border-white/10">
+              <div class="flex items-center gap-1 relative">
+                <!-- Color Picker Trigger -->
+                <button id="composer-color-trigger" type="button" title="Background options" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                </button>
+                <!-- Toggle Text <-> Checklist -->
+                <button id="composer-toggle-type" type="button" title="Toggle Checkboxes" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                </button>
+                <!-- Reminder Trigger -->
+                <button id="composer-reminder-trigger" type="button" title="Add Reminder" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </button>
+                <!-- Label Trigger -->
+                <button id="composer-label-trigger" type="button" title="Add Label" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                </button>
+                <!-- Drawing Trigger -->
+                <button id="composer-drawing-trigger" type="button" title="Add Freehand Drawing" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <!-- Image Upload Trigger -->
+                <button id="composer-image-trigger" type="button" title="Attach Image" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button id="composer-save-btn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 transition">Save & Close</button>
+              </div>
+            </div>
+
+            <!-- Composer Popover: Color Swatches -->
+            <div id="composer-color-popover" class="hidden pt-2 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2"></div>
+
+            <!-- Composer Popover: Label Checkboxes -->
+            <div id="composer-label-popover" class="hidden pt-2 border-t border-black/10 dark:border-white/10 space-y-2">
+              <div class="text-xs font-semibold text-slate-500">Assign Labels</div>
+              <div id="composer-label-options" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <!-- Composer Popover: Reminder Picker -->
+            <div id="composer-reminder-popover" class="hidden pt-2 border-t border-black/10 dark:border-white/10 flex flex-wrap items-center gap-2">
+              <input id="composer-reminder-input" type="datetime-local" class="px-2.5 py-1 rounded-lg text-xs bg-black/5 dark:bg-white/10 outline-none" />
+              <button id="composer-set-reminder-btn" type="button" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-400 text-slate-950">Set Reminder</button>
+              <button id="composer-clear-reminder-btn" type="button" class="px-2 py-1 rounded-lg text-xs text-rose-500 hover:underline">Clear</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Hidden File Input for Image Attachments -->
+      <input id="hidden-image-input" type="file" accept="image/*" class="hidden" />
+
+      <!-- PINNED MASONRY SECTION -->
+      <section id="section-pinned" class="mb-10 hidden">
+        <h2 class="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-[#9aa0a6] mb-3 px-1">Pinned</h2>
+        <div id="grid-pinned" class="masonry-stage"></div>
+      </section>
+
+      <!-- OTHERS / MAIN MASONRY SECTION -->
+      <section id="section-others">
+        <h2 id="heading-others" class="text-[11px] font-semibold uppercase tracking-widest text-slate-400 dark:text-[#9aa0a6] mb-3 px-1 hidden">Others</h2>
+        <div id="grid-others" class="masonry-stage"></div>
+      </section>
+
+      <!-- Empty State -->
+      <div id="empty-board-state" class="hidden py-20 text-center space-y-3">
+        <div class="w-16 h-16 rounded-2xl bg-slate-200/70 dark:bg-[#303134] mx-auto flex items-center justify-center text-slate-400">
+          <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 21h6m-6-3h6m-3-15a6 6 0 00-4.5 9.96c.62.7 1.15 1.52 1.38 2.44h6.24c.23-.92.76-1.74 1.38-2.44A6 6 0 0012 3z"/></svg>
+        </div>
+        <p id="empty-state-title" class="text-base font-medium text-slate-500 dark:text-slate-400">Notes you add appear here</p>
+        <p class="text-xs text-slate-400">Click "Take a note..." above or press <kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#303134] font-mono">c</kbd> to capture an idea.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- EXPANDED NOTE MODAL EDITOR (FLIP OVERLAY) -->
+  <div id="note-modal-backdrop" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div id="note-modal-card" class="modal-enter w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-300 dark:border-[#5f6368] bg-white dark:bg-[#202124] shadow-2xl overflow-hidden">
+      <!-- Modal Attachments -->
+      <div id="modal-attachments" class="grid grid-cols-2 gap-2 p-3 pb-0 max-h-60 overflow-y-auto empty:hidden"></div>
+
+      <!-- Modal Header -->
+      <div class="flex items-start justify-between gap-2 px-5 pt-4 pb-2">
+        <input id="modal-title-input" type="text" placeholder="Title" class="w-full bg-transparent font-semibold text-lg outline-none" />
+        <button id="modal-pin-btn" type="button" title="Toggle Pin" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+        </button>
+      </div>
+
+      <!-- Modal Scrollable Content -->
+      <div class="px-5 py-2 flex-1 overflow-y-auto space-y-3">
+        <!-- Text Editor -->
+        <textarea id="modal-text-input" rows="6" placeholder="Note" class="w-full bg-transparent text-sm outline-none resize-y leading-relaxed"></textarea>
+
+        <!-- Checklist Editor -->
+        <div id="modal-list-wrapper" class="hidden space-y-2">
+          <div id="modal-unchecked-items" class="space-y-1.5"></div>
+          <div class="flex items-center gap-2 py-1 border-t border-black/10 dark:border-white/10">
+            <span class="text-slate-400 font-bold">+</span>
+            <input id="modal-new-item-input" type="text" placeholder="Add list item (Enter)" class="w-full bg-transparent text-sm outline-none" />
+          </div>
+          <div id="modal-checked-section" class="pt-2 border-t border-black/10 dark:border-white/10 hidden">
+            <div id="modal-checked-header" class="text-xs font-medium text-slate-500 mb-1.5">Checked items</div>
+            <div id="modal-checked-items" class="space-y-1 opacity-75"></div>
+          </div>
+        </div>
+
+        <!-- Modal Badges -->
+        <div id="modal-badges" class="flex flex-wrap gap-1.5 pt-2 empty:hidden"></div>
+
+        <!-- Modal Color Swatches Row -->
+        <div class="pt-2 border-t border-black/10 dark:border-white/10">
+          <div class="text-[11px] font-semibold uppercase tracking-wider opacity-60 mb-1.5">Card Color (`ColorValue`)</div>
+          <div id="modal-color-swatches" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Modal Labels & Reminder Editor Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-black/10 dark:border-white/10">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider opacity-60 mb-1.5">Labels</div>
+            <div id="modal-label-toggles" class="flex flex-wrap gap-1.5"></div>
+          </div>
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-wider opacity-60 mb-1.5">Reminder (`Google Tasks Sync`)</div>
+            <div class="flex items-center gap-1.5">
+              <input id="modal-reminder-input" type="datetime-local" class="px-2 py-1 rounded text-xs bg-black/5 dark:bg-white/10 outline-none flex-1" />
+              <button id="modal-clear-reminder-btn" type="button" class="text-xs text-rose-500 hover:underline">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer Actions -->
+      <div class="px-5 py-3 border-t border-black/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-2 bg-black/[0.02] dark:bg-white/[0.02]">
+        <div class="flex items-center gap-1">
+          <button id="modal-toggle-type-btn" type="button" title="Switch Text / Checklist" class="px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10">Toggle List</button>
+          <button id="modal-draw-btn" type="button" title="Add Drawing to Note" class="px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10">+ Drawing</button>
+          <button id="modal-duplicate-btn" type="button" title="Duplicate Note" class="px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10">Duplicate</button>
+          <button id="modal-archive-btn" type="button" title="Archive / Unarchive" class="px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10">Archive</button>
+          <button id="modal-trash-btn" type="button" title="Delete / Restore" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-500 hover:bg-rose-500/10">Delete</button>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="modal-timestamp-label" class="text-[11px] opacity-60 font-mono">Edited just now</span>
+          <button id="modal-close-btn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 transition">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FREEHAND HTML5 CANVAS DRAWING STUDIO MODAL -->
+  <div id="drawing-modal-backdrop" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl rounded-2xl bg-white dark:bg-[#202124] border border-slate-300 dark:border-[#5f6368] shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-[#3c4043] flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-sm">Keep Freehand Ink & OCR Studio</span>
+          <div class="flex items-center gap-1 ml-2">
+            <button type="button" data-brush-color="#f59e0b" class="draw-color-btn w-5 h-5 rounded-full bg-amber-500 ring-2 ring-offset-1 ring-amber-400"></button>
+            <button type="button" data-brush-color="#3b82f6" class="draw-color-btn w-5 h-5 rounded-full bg-blue-500"></button>
+            <button type="button" data-brush-color="#10b981" class="draw-color-btn w-5 h-5 rounded-full bg-emerald-500"></button>
+            <button type="button" data-brush-color="#ef4444" class="draw-color-btn w-5 h-5 rounded-full bg-rose-500"></button>
+            <button type="button" data-brush-color="#ffffff" class="draw-color-btn w-5 h-5 rounded-full bg-white border border-slate-400"></button>
+            <button type="button" data-brush-color="#111827" class="draw-color-btn w-5 h-5 rounded-full bg-slate-900 border border-slate-500"></button>
+          </div>
+          <select id="draw-size-select" class="ml-2 px-2 py-1 rounded text-xs bg-slate-100 dark:bg-[#303134] outline-none">
+            <option value="3">Fine Ink (3px)</option>
+            <option value="6" selected>Marker (6px)</option>
+            <option value="14">Highlighter (14px)</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="draw-ocr-label-input" type="text" placeholder="OCR / Sketch Tag (for instant search)" class="px-2.5 py-1 rounded-lg text-xs bg-slate-100 dark:bg-[#303134] outline-none w-48" />
+          <button id="btn-draw-clear" type="button" class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#303134] hover:bg-slate-200">Clear</button>
+          <button id="btn-draw-cancel" type="button" class="px-2.5 py-1 rounded-lg text-xs font-medium hover:underline">Cancel</button>
+          <button id="btn-draw-save" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300">Attach Drawing</button>
+        </div>
+      </div>
+      <div class="bg-[#18191c] flex items-center justify-center p-2">
+        <canvas id="drawing-canvas" width="720" height="400" class="w-full max-w-[720px] h-[340px] bg-[#1e1f23] rounded-xl cursor-crosshair border border-slate-700 touch-none"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- LABEL MANAGER MODAL -->
+  <div id="label-modal-backdrop" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div class="w-full max-w-sm rounded-2xl bg-white dark:bg-[#28292c] border border-slate-200 dark:border-[#3c4043] shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-base">Edit Labels</h3>
+        <button id="btn-close-label-modal" type="button" class="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-[#3c4043]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="new-label-name-input" type="text" placeholder="Create new label..." class="flex-1 px-3 py-1.5 rounded-lg text-sm bg-slate-100 dark:bg-[#202124] outline-none border border-transparent focus:border-amber-400" />
+        <button id="btn-create-label" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300">Add</button>
+      </div>
+      <div id="label-manager-list" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- EXPORT / IMPORT VAULT MODAL -->
+  <div id="export-modal-backdrop" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white dark:bg-[#28292c] border border-slate-200 dark:border-[#3c4043] shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-base">Backup & Markdown Vault Sync (`KeIO` Compatible)</h3>
+        <button id="btn-close-export-modal" type="button" class="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-[#3c4043]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Export your complete `TopLevelNode` graph as JSON or Markdown with sync frontmatter, or import a JSON snapshot.</p>
+      <div class="flex flex-wrap gap-2">
+        <button id="btn-download-json" type="button" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300">Download JSON Snapshot</button>
+        <button id="btn-download-markdown" type="button" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-[#35363a] hover:bg-slate-200">Export Markdown Bundle (.md)</button>
+        <label class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-[#35363a] hover:bg-slate-200 cursor-pointer">
+          <span>Import JSON</span>
+          <input id="import-json-input" type="file" accept=".json" class="hidden" />
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNDO TOAST NOTIFICATION -->
+  <div id="undo-toast" class="hidden fixed bottom-5 left-5 z-50 flex items-center gap-4 px-4 py-3 rounded-xl bg-slate-900 dark:bg-[#323639] text-white shadow-2xl border border-slate-700 text-sm">
+    <span id="undo-toast-message">Note archived</span>
+    <button id="btn-undo-action" type="button" class="font-semibold text-amber-400 hover:underline">Undo</button>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. CANONICAL GOOGLE KEEP COLOR PALETTE (LIGHT & DARK TOKENS)
+      // =========================================================================
+      const KEEP_COLORS = {
+        DEFAULT: { label: 'Default', lightBg: '#ffffff', darkBg: '#202124', borderLight: '#e2e8f0', borderDark: '#5f6368', swatch: '#5f6368' },
+        CORAL:   { label: 'Coral',   lightBg: '#faafa8', darkBg: '#77172e', borderLight: '#f28b82', borderDark: '#a52714', swatch: '#f28b82' },
+        PEACH:   { label: 'Peach',   lightBg: '#f39f76', darkBg: '#692b17', borderLight: '#fbbc04', borderDark: '#b06000', swatch: '#fbbc04' },
+        SAND:    { label: 'Sand',    lightBg: '#fff8b8', darkBg: '#7c4a03', borderLight: '#fff475', borderDark: '#b06000', swatch: '#fff475' },
+        MINT:    { label: 'Mint',    lightBg: '#e2f6d3', darkBg: '#264d3b', borderLight: '#ccff90', borderDark: '#0d652d', swatch: '#ccff90' },
+        SAGE:    { label: 'Sage',    lightBg: '#b4ddd3', darkBg: '#0c625d', borderLight: '#a7ffeb', borderDark: '#007b83', swatch: '#a7ffeb' },
+        FOG:     { label: 'Fog',     lightBg: '#d4e4ed', darkBg: '#256377', borderLight: '#cbf0f8', borderDark: '#007b83', swatch: '#cbf0f8' },
+        STORM:   { label: 'Storm',   lightBg: '#aeccdc', darkBg: '#284255', borderLight: '#aecbfa', borderDark: '#174ea6', swatch: '#aecbfa' },
+        DUSK:    { label: 'Dusk',    lightBg: '#d3bfdb', darkBg: '#472e5b', borderLight: '#d7aefb', borderDark: '#681da8', swatch: '#d7aefb' },
+        BLOSSOM: { label: 'Blossom', lightBg: '#f6e2dd', darkBg: '#6c394f', borderLight: '#fdcfe8', borderDark: '#9c166b', swatch: '#fdcfe8' },
+        CLAY:    { label: 'Clay',    lightBg: '#e9e3d4', darkBg: '#4b443a', borderLight: '#e6c9a8', borderDark: '#795548', swatch: '#e6c9a8' },
+        CHALK:   { label: 'Chalk',   lightBg: '#efeff1', darkBg: '#232427', borderLight: '#e8eaed', borderDark: '#3c4043', swatch: '#9aa0a6' }
+      };
+
+      // =========================================================================
+      // 2. INITIAL GROUNDED SEED DATA (NON-EMPTY INITIAL STATE)
+      // =========================================================================
+      const INITIAL_LABELS = ['Architecture', 'Production', 'Prompts', 'Checklists'];
+
+      const INITIAL_NOTES = [
+        {
+          id: 'notes/keep_rea_01',
+          type: 'LIST',
+          title: 'REA-Architect Clean-Room Verification Spec',
+          text: '',
+          items: [
+            { id: 'item_1', parentId: 'notes/keep_rea_01', parentItemId: null, text: 'Shortest-Column Masonry Bin-Packing (translate3d)', checked: true, indented: false, sort: 5000 },
+            { id: 'item_2', parentId: 'notes/keep_rea_01', parentItemId: null, text: 'Polymorphic TopLevelNode <-> ListItem conversion', checked: false, indented: false, sort: 4000 },
+            { id: 'item_3', parentId: 'notes/keep_rea_01', parentItemId: 'item_2', text: '1-level subtask indentation & parent check cascade', checked: false, indented: true, sort: 3500 },
+            { id: 'item_4', parentId: 'notes/keep_rea_01', parentItemId: null, text: 'Local-first IndexedDB + Undo Snapshot Stack', checked: false, indented: false, sort: 3000 }
+          ],
+          color: 'MINT',
+          pinned: true,
+          archived: false,
+          trashed: false,
+          trashedAt: null,
+          labels: ['Architecture', 'Checklists'],
+          attachments: [],
+          reminder: { fireAt: '2026-11-18T09:00', recurrence: 'NONE', completed: false },
+          sortOrder: 9000,
+          timestamps: { created: '2026-11-17T08:00:00Z', updated: '2026-11-17T08:30:00Z', userEdited: '2026-11-17T08:30:00Z' },
+          dirty: false
+        },
+        {
+          id: 'notes/keep_rea_02',
+          type: 'TEXT',
+          title: 'Google Keep Sync & Node-Tree Mechanics',
+          text: 'Every card in Google Keep is a TopLevelNode stored in IndexedDB.\n\n• Consumer clients batch delta mutations via POST /notes/v1/changes\n• Workspace Enterprise uses gRPC-transcoded REST at keep.googleapis.com/v1/notes\n• Click this card to open the FLIP modal editor or convert these lines into checkboxes.',
+          items: [],
+          color: 'STORM',
+          pinned: true,
+          archived: false,
+          trashed: false,
+          trashedAt: null,
+          labels: ['Architecture'],
+          attachments: [],
+          reminder: null,
+          sortOrder: 8000,
+          timestamps: { created: '2026-11-17T07:40:00Z', updated: '2026-11-17T08:15:00Z', userEdited: '2026-11-17T08:15:00Z' },
+          dirty: false
+        },
+        {
+          id: 'notes/keep_rea_03',
+          type: 'LIST',
+          title: 'TenSec English — Next Short-Form Batch',
+          text: '',
+          items: [
+            { id: 'item_31', parentId: 'notes/keep_rea_03', parentItemId: null, text: 'Hook: "We Have No Reservation Under Your Name"', checked: true, indented: false, sort: 4000 },
+            { id: 'item_32', parentId: 'notes/keep_rea_03', parentItemId: null, text: 'Verify top-center TenSec-English watermark placement', checked: false, indented: false, sort: 3000 },
+            { id: 'item_33', parentId: 'notes/keep_rea_03', parentItemId: null, text: 'Render 9:16 single-character clip (100% English)', checked: false, indented: false, sort: 2000 }
+          ],
+          color: 'SAND',
+          pinned: false,
+          archived: false,
+          trashed: false,
+          trashedAt: null,
+          labels: ['Production', 'Prompts'],
+          attachments: [],
+          reminder: { fireAt: '2026-11-17T18:30', recurrence: 'DAILY', completed: false },
+          sortOrder: 7000,
+          timestamps: { created: '2026-11-16T18:00:00Z', updated: '2026-11-17T06:00:00Z', userEdited: '2026-11-17T06:00:00Z' },
+          dirty: false
+        },
+        {
+          id: 'notes/keep_rea_04',
+          type: 'TEXT',
+          title: 'Masonry Bin-Packing Formula',
+          text: 'Column count C = max(1, floor((W + gap) / (cardWidth + gap))).\nEach card is placed at c* = argmin H[c] so tall checklists and short notes pack tightly without row gaps.',
+          items: [],
+          color: 'DUSK',
+          pinned: false,
+          archived: false,
+          trashed: false,
+          trashedAt: null,
+          labels: ['Architecture'],
+          attachments: [],
+          reminder: null,
+          sortOrder: 6000,
+          timestamps: { created: '2026-11-16T15:20:00Z', updated: '2026-11-16T15:20:00Z', userEdited: '2026-11-16T15:20:00Z' },
+          dirty: false
+        }
+      ];
+
+      // =========================================================================
+      // 3. APPLICATION STATE & STORAGE ENGINE (INDEXEDDB + LOCALSTORAGE MIRROR)
+      // =========================================================================
+      const state = {
+        notes: [],
+        labels: [],
+        activeNav: 'NOTES',           // 'NOTES' | 'REMINDERS' | 'ARCHIVE' | 'TRASH' | 'LABEL:<name>'
+        viewMode: 'MASONRY_GRID',     // 'MASONRY_GRID' | 'SINGLE_COLUMN_LIST'
+        darkMode: true,
+        sidebarOpen: true,
+        reaInspectorOpen: false,
+        searchQuery: '',
+        searchFilters: {
+          type: 'ALL',                // 'ALL' | 'LISTS' | 'REMINDERS' | 'DRAWINGS'
+          color: null
+        },
+        selectedNoteIds: new Set(),
+        activeModalNoteId: null,
+        drawingTarget: 'COMPOSER',    // 'COMPOSER' | 'MODAL' | 'QUICK_NEW'
+        imageUploadTarget: 'COMPOSER',
+        undoStack: [],
+        lastMutationName: 'HYDRATE_STORE',
+        telemetryVectors: { pinned: [], others: [], cols: 0 },
+        composer: {
+          expanded: false,
+          type: 'TEXT',
+          title: '',
+          text: '',
+          items: [],
+          color: 'DEFAULT',
+          pinned: false,
+          labels: [],
+          attachments: [],
+          reminder: null
+        }
+      };
+
+      let undoTimeoutId = null;
+
+      function uid(prefix) {
+        return prefix + '_' + Math.random().toString(36).slice(2, 9) + '_' + Date.now().toString(36);
+      }
+
+      function cloneDeep(obj) {
+        return JSON.parse(JSON.stringify(obj));
+      }
+
+      // LocalStorage & IndexedDB Persistence
+      const STORAGE_KEY = 'keep_cleanroom_rea_v1';
+
+      function loadStateFromStorage() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.notes) && parsed.notes.length > 0) {
+              state.notes = parsed.notes;
+              state.labels = Array.isArray(parsed.labels) ? parsed.labels : INITIAL_LABELS.slice();
+              state.darkMode = parsed.darkMode !== undefined ? parsed.darkMode : true;
+              state.viewMode = parsed.viewMode || 'MASONRY_GRID';
+              return;
+            }
+          }
+        } catch (err) {
+          // Fallback to in-memory seed data if sandboxed storage is restricted
+        }
+        state.notes = cloneDeep(INITIAL_NOTES);
+        state.labels = INITIAL_LABELS.slice();
+      }
+
+      function persistState(mutationLabel) {
+        state.lastMutationName = mutationLabel || 'STATE_SYNC';
+        const statusText = document.getElementById('sync-status-text');
+        if (statusText) statusText.textContent = 'Syncing...';
+
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            notes: state.notes,
+            labels: state.labels,
+            darkMode: state.darkMode,
+            viewMode: state.viewMode
+          }));
+        } catch (err) {
+          // Ignore quota or sandboxed errors
+        }
+
+        // Mirror to IndexedDB asynchronously when available
+        try {
+          if (window.indexedDB) {
+            const req = window.indexedDB.open('KeepCleanRoomDB', 1);
+            req.onupgradeneeded = function (e) {
+              const db = e.target.result;
+              if (!db.objectStoreNames.contains('nodes')) {
+                db.createObjectStore('nodes', { keyPath: 'id' });
+              }
+            };
+            req.onsuccess = function (e) {
+              const db = e.target.result;
+              const tx = db.transaction('nodes', 'readwrite');
+              const store = tx.objectStore('nodes');
+              state.notes.forEach(function (n) { store.put(n); });
+            };
+          }
+        } catch (err) {
+          // Ignore IndexedDB restrictions in strict iframes
+        }
+
+        setTimeout(function () {
+          if (statusText) statusText.textContent = 'Synced';
+        }, 240);
+      }
+
+      function pushUndoSnapshot(message) {
+        state.undoStack.push({
+          message: message,
+          notes: cloneDeep(state.notes)
+        });
+        if (state.undoStack.length > 15) state.undoStack.shift();
+        showUndoToast(message);
+      }
+
+      function showUndoToast(message) {
+        const toast = document.getElementById('undo-toast');
+        const msgEl = document.getElementById('undo-toast-message');
+        if (!toast || !msgEl) return;
+        msgEl.textContent = message;
+        toast.classList.remove('hidden');
+        if (undoTimeoutId) clearTimeout(undoTimeoutId);
+        undoTimeoutId = setTimeout(function () {
+          toast.classList.add('hidden');
+        }, 5000);
+      }
+
+      // =========================================================================
+      // 4. POLYMORPHIC TEXT <-> CHECKLIST CONVERSION ENGINE
+      // =========================================================================
+      function convertTextToItems(text, parentId) {
+        const lines = (text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+        return lines.map(function (line, idx) {
+          return {
+            id: uid('item'),
+            parentId: parentId || 'composer',
+            parentItemId: null,
+            text: line.replace(/^([•\-*]\s+|\[\s*\]\s+)/, ''),
+            checked: false,
+            indented: false,
+            sort: (lines.length - idx) * 1000
+          };
+        });
+      }
+
+      function convertItemsToText(items) {
+        const sorted = (items || []).slice().sort(function (a, b) { return b.sort - a.sort; });
+        return sorted.map(function (it) { return (it.indented ? '  ' : '') + it.text; }).join('\n');
+      }
+
+      // =========================================================================
+      // 5. MULTI-FACETED FILTER & SEARCH ENGINE
+      // =========================================================================
+      function getFilteredNotes() {
+        const q = state.searchQuery.trim().toLowerCase();
+        return state.notes.filter(function (note) {
+          // 1. Navigation Scope
+          if (state.activeNav === 'TRASH') {
+            if (!note.trashed) return false;
+          } else {
+            if (note.trashed) return false;
+            if (state.activeNav === 'NOTES' && note.archived && !q && state.searchFilters.type === 'ALL' && !state.searchFilters.color) {
+              return false;
+            }
+            if (state.activeNav === 'ARCHIVE' && !note.archived) return false;
+            if (state.activeNav === 'REMINDERS' && !note.reminder) return false;
+            if (state.activeNav.indexOf('LABEL:') === 0) {
+              const targetLabel = state.activeNav.slice(6);
+              if (!note.labels || note.labels.indexOf(targetLabel) === -1) return false;
+            }
+          }
+
+          // 2. Facet Type Filter
+          if (state.searchFilters.type === 'LISTS' && note.type !== 'LIST') return false;
+          if (state.searchFilters.type === 'REMINDERS' && !note.reminder) return false;
+          if (state.searchFilters.type === 'DRAWINGS' && (!note.attachments || note.attachments.length === 0)) return false;
+
+          // 3. Facet Color Filter
+          if (state.searchFilters.color && note.color !== state.searchFilters.color) return false;
+
+          // 4. Query Substring Match (Title, Body, Checklist Items, Labels, OCR Extracted Text)
+          if (q) {
+            const inTitle = (note.title || '').toLowerCase().indexOf(q) !== -1;
+            const inText = (note.text || '').toLowerCase().indexOf(q) !== -1;
+            const inItems = (note.items || []).some(function (it) { return (it.text || '').toLowerCase().indexOf(q) !== -1; });
+            const inLabels = (note.labels || []).some(function (lb) { return lb.toLowerCase().indexOf(q) !== -1 || ('#' + lb.toLowerCase()).indexOf(q) !== -1; });
+            const inOcr = (note.attachments || []).some(function (at) { return (at.extractedText || '').toLowerCase().indexOf(q) !== -1; });
+            if (!inTitle && !inText && !inItems && !inLabels && !inOcr) return false;
+          }
+
+          return true;
+        }).sort(function (a, b) {
+          return (b.sortOrder || 0) - (a.sortOrder || 0);
+        });
+      }
+
+      // =========================================================================
+      // 6. SHORTEST-COLUMN MASONRY BIN-PACKING ENGINE
+      // =========================================================================
+      let masonryRafId = null;
+
+      function scheduleMasonryLayout() {
+        if (masonryRafId) cancelAnimationFrame(masonryRafId);
+        masonryRafId = requestAnimationFrame(function () {
+          runMasonryPass('grid-pinned', 'pinned');
+          runMasonryPass('grid-others', 'others');
+          updateReaTelemetryUI();
+        });
+      }
+
+      function runMasonryPass(containerId, telemetryKey) {
+        const stage = document.getElementById(containerId);
+        if (!stage) return;
+        const cards = Array.from(stage.querySelectorAll('.masonry-card'));
+        if (cards.length === 0) {
+          stage.style.height = '0px';
+          state.telemetryVectors[telemetryKey] = [0];
+          return;
+        }
+
+        const stageWidth = stage.clientWidth || 800;
+        const gap = 16;
+
+        if (state.viewMode === 'SINGLE_COLUMN_LIST') {
+          const maxListWidth = Math.min(600, stageWidth);
+          const leftOffset = Math.max(0, Math.floor((stageWidth - maxListWidth) / 2));
+          let yCursor = 0;
+          cards.forEach(function (card) {
+            card.style.width = maxListWidth + 'px';
+            card.style.transform = 'translate3d(' + leftOffset + 'px, ' + yCursor + 'px, 0)';
+            yCursor += card.offsetHeight + gap;
+          });
+          stage.style.height = Math.max(0, yCursor - gap) + 'px';
+          state.telemetryVectors.cols = 1;
+          state.telemetryVectors[telemetryKey] = [Math.round(yCursor)];
+          return;
+        }
+
+        const minCardWidth = stageWidth < 520 ? stageWidth : 240;
+        const cols = Math.max(1, Math.floor((stageWidth + gap) / (minCardWidth + gap)));
+        const computedCardWidth = Math.floor((stageWidth - (cols - 1) * gap) / cols);
+        const colHeights = new Array(cols).fill(0);
+
+        cards.forEach(function (card) {
+          card.style.width = computedCardWidth + 'px';
+          // Find shortest column c* = argmin H[c]
+          let minCol = 0;
+          for (let c = 1; c < cols; c++) {
+            if (colHeights[c] < colHeights[minCol]) {
+              minCol = c;
+            }
+          }
+          const x = minCol * (computedCardWidth + gap);
+          const y = colHeights[minCol];
+          card.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
+          colHeights[minCol] += card.offsetHeight + gap;
+        });
+
+        const totalHeight = Math.max.apply(null, colHeights);
+        stage.style.height = Math.max(0, totalHeight - gap) + 'px';
+        state.telemetryVectors.cols = cols;
+        state.telemetryVectors[telemetryKey] = colHeights.map(function (h) { return Math.round(h); });
+      }
+
+      // =========================================================================
+      // 7. DOM RENDERING PIPELINE
+      // =========================================================================
+      function getCardThemeStyle(colorId) {
+        const token = KEEP_COLORS[colorId] || KEEP_COLORS.DEFAULT;
+        const bg = state.darkMode ? token.darkBg : token.lightBg;
+        const border = state.darkMode ? token.borderDark : token.borderLight;
+        return { bg: bg, border: border };
+      }
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function renderCardElement(note) {
+        const article = document.createElement('article');
+        const isSelected = state.selectedNoteIds.has(note.id);
+        const theme = getCardThemeStyle(note.color);
+
+        article.className = 'masonry-card rounded-2xl border p-4 flex flex-col justify-between gap-3 cursor-pointer select-none group ' + (isSelected ? 'selected ring-2 ring-amber-400' : 'hover:shadow-lg');
+        article.style.backgroundColor = theme.bg;
+        article.style.borderColor = isSelected ? '#fbbf24' : theme.border;
+        article.setAttribute('data-note-id', note.id);
+        article.setAttribute('draggable', 'true');
+
+        // Selection Checkmark Badge
+        const checkBtn = document.createElement('button');
+        checkBtn.type = 'button';
+        checkBtn.title = 'Select note';
+        checkBtn.className = 'select-check absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md border ' + (isSelected ? 'bg-amber-400 text-slate-950 border-amber-500' : 'bg-white dark:bg-[#202124] text-slate-600 dark:text-slate-200 border-slate-300 dark:border-slate-600');
+        checkBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+        checkBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          toggleSelectNote(note.id);
+        });
+        article.appendChild(checkBtn);
+
+        // Top Content Container
+        const topWrap = document.createElement('div');
+        topWrap.className = 'space-y-2.5';
+
+        // Attachments Preview
+        if (note.attachments && note.attachments.length > 0) {
+          const attGrid = document.createElement('div');
+          attGrid.className = 'grid gap-1.5 ' + (note.attachments.length > 1 ? 'grid-cols-2' : 'grid-cols-1');
+          note.attachments.forEach(function (att) {
+            const imgWrap = document.createElement('div');
+            imgWrap.className = 'relative rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-black/20';
+            const img = document.createElement('img');
+            img.src = att.dataUrl;
+            img.alt = att.extractedText || 'Note attachment';
+            img.className = 'w-full h-32 object-cover';
+            img.addEventListener('load', scheduleMasonryLayout);
+            imgWrap.appendChild(img);
+            if (att.extractedText) {
+              const ocrBadge = document.createElement('span');
+              ocrBadge.className = 'absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/70 text-[10px] font-mono text-amber-300 truncate max-w-[90%]';
+              ocrBadge.textContent = 'OCR: ' + att.extractedText;
+              imgWrap.appendChild(ocrBadge);
+            }
+            attGrid.appendChild(imgWrap);
+          });
+          topWrap.appendChild(attGrid);
+        }
+
+        // Title + Pin Row
+        const headerRow = document.createElement('div');
+        headerRow.className = 'flex items-start justify-between gap-2';
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'font-semibold text-sm leading-snug break-words ' + (!note.title ? 'opacity-40 italic' : '');
+        titleEl.textContent = note.title || 'Untitled';
+        headerRow.appendChild(titleEl);
+
+        const pinBtn = document.createElement('button');
+        pinBtn.type = 'button';
+        pinBtn.title = note.pinned ? 'Unpin note' : 'Pin note';
+        pinBtn.className = 'p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 shrink-0 transition ' + (note.pinned ? 'text-amber-500' : 'opacity-40 group-hover:opacity-100');
+        pinBtn.innerHTML = '<svg class="w-4 h-4" fill="' + (note.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
+        pinBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          togglePinNote(note.id);
+        });
+        headerRow.appendChild(pinBtn);
+        topWrap.appendChild(headerRow);
+
+        // Polymorphic Body: Plain Text vs Checklist
+        if (note.type === 'LIST') {
+          const listWrap = document.createElement('div');
+          listWrap.className = 'space-y-1.5 text-xs';
+          const sortedItems = (note.items || []).slice().sort(function (a, b) { return b.sort - a.sort; });
+          const unchecked = sortedItems.filter(function (i) { return !i.checked; });
+          const checked = sortedItems.filter(function (i) { return i.checked; });
+
+          unchecked.slice(0, 8).forEach(function (item) {
+            const row = document.createElement('label');
+            row.className = 'flex items-start gap-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 p-1 rounded ' + (item.indented ? 'pl-5' : '');
+            row.addEventListener('click', function (e) { e.stopPropagation(); });
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = false;
+            cb.className = 'mt-0.5 rounded accent-amber-400';
+            cb.addEventListener('change', function () {
+              toggleChecklistItemOnCard(note.id, item.id);
+            });
+            const span = document.createElement('span');
+            span.className = 'leading-relaxed break-words';
+            span.textContent = item.text;
+            row.appendChild(cb);
+            row.appendChild(span);
+            listWrap.appendChild(row);
+          });
+
+          if (checked.length > 0) {
+            const checkedSummary = document.createElement('div');
+            checkedSummary.className = 'pt-1.5 border-t border-black/10 dark:border-white/10 text-[11px] opacity-65 font-medium';
+            checkedSummary.textContent = '+ ' + checked.length + ' checked item' + (checked.length > 1 ? 's' : '');
+            listWrap.appendChild(checkedSummary);
+          }
+          topWrap.appendChild(listWrap);
+        } else if (note.text) {
+          const bodyP = document.createElement('p');
+          bodyP.className = 'text-xs leading-relaxed whitespace-pre-line break-words opacity-90 line-clamp-8';
+          bodyP.textContent = note.text;
+          topWrap.appendChild(bodyP);
+        }
+
+        // Labels & Reminder Pills
+        if ((note.labels && note.labels.length > 0) || note.reminder || note.archived) {
+          const pillRow = document.createElement('div');
+          pillRow.className = 'flex flex-wrap gap-1 pt-1';
+
+          if (note.reminder) {
+            const remPill = document.createElement('span');
+            remPill.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30';
+            remPill.textContent = '⏰ ' + note.reminder.fireAt.replace('T', ' ');
+            pillRow.appendChild(remPill);
+          }
+
+          (note.labels || []).forEach(function (lb) {
+            const lbPill = document.createElement('span');
+            lbPill.className = 'px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/10 dark:bg-white/10';
+            lbPill.textContent = '#' + lb;
+            lbPill.addEventListener('click', function (e) {
+              e.stopPropagation();
+              state.activeNav = 'LABEL:' + lb;
+              renderAll();
+            });
+            pillRow.appendChild(lbPill);
+          });
+
+          if (note.archived && state.activeNav !== 'ARCHIVE') {
+            const archBadge = document.createElement('span');
+            archBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono uppercase opacity-60 border border-current';
+            archBadge.textContent = 'Archived';
+            pillRow.appendChild(archBadge);
+          }
+
+          topWrap.appendChild(pillRow);
+        }
+
+        article.appendChild(topWrap);
+
+        // Card Hover Action Bar
+        const footerBar = document.createElement('div');
+        footerBar.className = 'card-actions flex items-center justify-between pt-2 border-t border-black/5 dark:border-white/5 text-xs';
+
+        if (note.trashed) {
+          const restoreBtn = document.createElement('button');
+          restoreBtn.type = 'button';
+          restoreBtn.className = 'px-2 py-1 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-medium';
+          restoreBtn.textContent = 'Restore';
+          restoreBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            restoreNoteFromTrash(note.id);
+          });
+
+          const purgeBtn = document.createElement('button');
+          purgeBtn.type = 'button';
+          purgeBtn.className = 'px-2 py-1 rounded bg-rose-500/20 text-rose-600 dark:text-rose-300 font-medium';
+          purgeBtn.textContent = 'Delete Forever';
+          purgeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            hardDeleteNote(note.id);
+          });
+
+          footerBar.appendChild(restoreBtn);
+          footerBar.appendChild(purgeBtn);
+        } else {
+          const leftActions = document.createElement('div');
+          leftActions.className = 'flex items-center gap-1';
+
+          // Quick Color Cycle Button
+          const colorBtn = document.createElement('button');
+          colorBtn.type = 'button';
+          colorBtn.title = 'Cycle card color';
+          colorBtn.className = 'p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10';
+          colorBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>';
+          colorBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            cycleNoteColor(note.id);
+          });
+
+          // Toggle Type (Text <-> Checklist)
+          const typeBtn = document.createElement('button');
+          typeBtn.type = 'button';
+          typeBtn.title = 'Convert Text / Checklist';
+          typeBtn.className = 'p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10';
+          typeBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>';
+          typeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            toggleNoteType(note.id);
+          });
+
+          // Archive Toggle
+          const archBtn = document.createElement('button');
+          archBtn.type = 'button';
+          archBtn.title = note.archived ? 'Unarchive' : 'Archive (e)';
+          archBtn.className = 'p-1.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10';
+          archBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>';
+          archBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            toggleArchiveNote(note.id);
+          });
+
+          // Trash Button
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.title = 'Move to Trash (#)';
+          delBtn.className = 'p-1.5 rounded-full hover:bg-rose-500/20 text-rose-500';
+          delBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
+          delBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            moveNoteToTrash(note.id);
+          });
+
+          leftActions.appendChild(colorBtn);
+          leftActions.appendChild(typeBtn);
+          leftActions.appendChild(archBtn);
+          leftActions.appendChild(delBtn);
+          footerBar.appendChild(leftActions);
+
+          const editHint = document.createElement('span');
+          editHint.className = 'text-[10px] font-mono opacity-50';
+          editHint.textContent = note.type === 'LIST' ? 'LIST' : 'TEXT';
+          footerBar.appendChild(editHint);
+        }
+
+        article.appendChild(footerBar);
+
+        // Card Click -> Open Modal Editor (unless in multi-select mode)
+        article.addEventListener('click', function () {
+          if (state.selectedNoteIds.size > 0) {
+            toggleSelectNote(note.id);
+          } else {
+            openNoteModal(note.id);
+          }
+        });
+
+        // HTML5 Drag & Drop Reordering
+        article.addEventListener('dragstart', function (e) {
+          article.classList.add('dragging');
+          e.dataTransfer.setData('text/plain', note.id);
+        });
+        article.addEventListener('dragend', function () {
+          article.classList.remove('dragging');
+        });
+        article.addEventListener('dragover', function (e) {
+          e.preventDefault();
+        });
+        article.addEventListener('drop', function (e) {
+          e.preventDefault();
+          const draggedId = e.dataTransfer.getData('text/plain');
+          if (draggedId && draggedId !== note.id) {
+            swapNoteSortOrder(draggedId, note.id);
+          }
+        });
+
+        return article;
+      }
+
+      function renderBoard() {
+        const filtered = getFilteredNotes();
+        const pinnedStage = document.getElementById('grid-pinned');
+        const othersStage = document.getElementById('grid-others');
+        const sectionPinned = document.getElementById('section-pinned');
+        const headingOthers = document.getElementById('heading-others');
+        const emptyState = document.getElementById('empty-board-state');
+        const trashBanner = document.getElementById('trash-view-banner');
+        const quickCapture = document.getElementById('quick-capture-wrapper');
+
+        if (!pinnedStage || !othersStage) return;
+
+        trashBanner.classList.toggle('hidden', state.activeNav !== 'TRASH');
+        quickCapture.classList.toggle('hidden', state.activeNav === 'TRASH' || state.activeNav === 'ARCHIVE');
+
+        pinnedStage.innerHTML = '';
+        othersStage.innerHTML = '';
+
+        const pinnedNotes = filtered.filter(function (n) { return n.pinned && !n.trashed; });
+        const otherNotes = filtered.filter(function (n) { return !n.pinned || n.trashed; });
+
+        if (pinnedNotes.length > 0) {
+          sectionPinned.classList.remove('hidden');
+          headingOthers.classList.toggle('hidden', otherNotes.length === 0);
+          pinnedNotes.forEach(function (n) {
+            pinnedStage.appendChild(renderCardElement(n));
+          });
+        } else {
+          sectionPinned.classList.add('hidden');
+          headingOthers.classList.add('hidden');
+        }
+
+        otherNotes.forEach(function (n) {
+          othersStage.appendChild(renderCardElement(n));
+        });
+
+        emptyState.classList.toggle('hidden', filtered.length > 0);
+        scheduleMasonryLayout();
+      }
+
+      function renderSidebarAndCounts() {
+        const activeNotesCount = state.notes.filter(function (n) { return !n.trashed && !n.archived; }).length;
+        const remindersCount = state.notes.filter(function (n) { return !n.trashed && Boolean(n.reminder); }).length;
+        const archiveCount = state.notes.filter(function (n) { return !n.trashed && n.archived; }).length;
+        const trashCount = state.notes.filter(function (n) { return n.trashed; }).length;
+
+        document.getElementById('nav-count-notes').textContent = activeNotesCount;
+        document.getElementById('nav-count-reminders').textContent = remindersCount;
+        document.getElementById('nav-count-archive').textContent = archiveCount;
+        document.getElementById('nav-count-trash').textContent = trashCount;
+
+        // Render Dynamic Label Items in Sidebar
+        const labelContainer = document.getElementById('sidebar-labels-container');
+        labelContainer.innerHTML = '';
+        state.labels.forEach(function (lb) {
+          const count = state.notes.filter(function (n) { return !n.trashed && n.labels && n.labels.indexOf(lb) !== -1; }).length;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('data-nav', 'LABEL:' + lb);
+          btn.className = 'nav-item w-full flex items-center justify-between px-4 py-2 rounded-r-full text-sm font-medium transition';
+          btn.innerHTML = '<span class="flex items-center gap-3 truncate"><svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg><span class="truncate">' + escapeHtml(lb) + '</span></span><span class="text-xs font-mono opacity-75">' + count + '</span>';
+          btn.addEventListener('click', function () {
+            state.activeNav = 'LABEL:' + lb;
+            renderAll();
+          });
+          labelContainer.appendChild(btn);
+        });
+
+        // Highlight active nav button
+        document.querySelectorAll('.nav-item').forEach(function (el) {
+          const navTarget = el.getAttribute('data-nav');
+          const isActive = navTarget === state.activeNav;
+          el.className = 'nav-item w-full flex items-center justify-between px-4 py-2.5 rounded-r-full text-sm font-medium transition ' + (isActive ? 'bg-amber-400/25 text-amber-900 dark:bg-[#41331c] dark:text-amber-300 font-semibold' : 'hover:bg-slate-100 dark:hover:bg-[#28292c] text-slate-700 dark:text-slate-300');
+        });
+
+        // Update Header Title
+        const headerTitle = document.getElementById('header-view-title');
+        if (state.activeNav === 'NOTES') headerTitle.textContent = 'Keep Studio';
+        else if (state.activeNav === 'REMINDERS') headerTitle.textContent = 'Reminders';
+        else if (state.activeNav === 'ARCHIVE') headerTitle.textContent = 'Archive';
+        else if (state.activeNav === 'TRASH') headerTitle.textContent = 'Trash';
+        else if (state.activeNav.indexOf('LABEL:') === 0) headerTitle.textContent = '#' + state.activeNav.slice(6);
+      }
+
+      function renderBatchHeader() {
+        const count = state.selectedNoteIds.size;
+        const normalHeader = document.getElementById('header-normal');
+        const batchHeader = document.getElementById('header-batch');
+        if (count > 0) {
+          normalHeader.classList.add('hidden');
+          batchHeader.classList.remove('hidden');
+          batchHeader.classList.add('flex');
+          document.getElementById('batch-count-label').textContent = count + ' selected';
+        } else {
+          normalHeader.classList.remove('hidden');
+          batchHeader.classList.add('hidden');
+          batchHeader.classList.remove('flex');
+        }
+      }
+
+      function updateReaTelemetryUI() {
+        const drawer = document.getElementById('rea-inspector-drawer');
+        if (!drawer || drawer.classList.contains('hidden')) return;
+        document.getElementById('rea-telemetry-summary').textContent = 'Columns: ' + state.telemetryVectors.cols + ' | Total Nodes: ' + state.notes.length;
+        document.getElementById('rea-col-vectors').textContent = 'Pinned H[c]: [' + state.telemetryVectors.pinned.join(', ') + 'px] | Others H[c]: [' + state.telemetryVectors.others.join(', ') + 'px]';
+        document.getElementById('rea-storage-metrics').textContent = 'Key: ' + STORAGE_KEY + ' | Labels: ' + state.labels.length + ' | Undo Depth: ' + state.undoStack.length;
+        document.getElementById('rea-last-mutation').textContent = state.lastMutationName + ' @ ' + new Date().toLocaleTimeString();
+      }
+
+      function renderAll() {
+        document.documentElement.classList.toggle('dark', state.darkMode);
+        renderSidebarAndCounts();
+        renderBatchHeader();
+        renderComposerUI();
+        renderBoard();
+      }
+
+      // =========================================================================
+      // 8. QUICK-CAPTURE COMPOSER CONTROLLER
+      // =========================================================================
+      function expandComposer(mode) {
+        state.composer.expanded = true;
+        if (mode === 'LIST' && state.composer.type !== 'LIST') {
+          state.composer.type = 'LIST';
+          state.composer.items = convertTextToItems(state.composer.text, 'composer');
+          state.composer.text = '';
+        } else if (mode === 'TEXT') {
+          state.composer.type = 'TEXT';
+        }
+        renderComposerUI();
+        setTimeout(function () {
+          const target = state.composer.type === 'LIST' ? document.getElementById('composer-new-item-input') : document.getElementById('composer-text');
+          if (target) target.focus();
+        }, 20);
+      }
+
+      function renderComposerUI() {
+        const collapsed = document.getElementById('composer-collapsed');
+        const expanded = document.getElementById('composer-expanded');
+        const card = document.getElementById('quick-capture-card');
+        if (!collapsed || !expanded || !card) return;
+
+        const theme = getCardThemeStyle(state.composer.color);
+        card.style.backgroundColor = theme.bg;
+        card.style.borderColor = theme.border;
+
+        if (!state.composer.expanded) {
+          collapsed.classList.remove('hidden');
+          expanded.classList.add('hidden');
+          return;
+        }
+
+        collapsed.classList.add('hidden');
+        expanded.classList.remove('hidden');
+
+        document.getElementById('composer-title').value = state.composer.title;
+        const textEl = document.getElementById('composer-text');
+        const listContainer = document.getElementById('composer-list-container');
+
+        if (state.composer.type === 'LIST') {
+          textEl.classList.add('hidden');
+          listContainer.classList.remove('hidden');
+          renderComposerListItems();
+        } else {
+          textEl.classList.remove('hidden');
+          listContainer.classList.add('hidden');
+          textEl.value = state.composer.text;
+        }
+
+        // Composer Attachments
+        const attBox = document.getElementById('composer-attachments');
+        attBox.innerHTML = '';
+        state.composer.attachments.forEach(function (att, idx) {
+          const div = document.createElement('div');
+          div.className = 'relative rounded-xl overflow-hidden border border-black/10';
+          div.innerHTML = '<img src="' + att.dataUrl + '" class="w-full h-28 object-cover" alt="Attachment" />';
+          const rmBtn = document.createElement('button');
+          rmBtn.type = 'button';
+          rmBtn.className = 'absolute top-1 right-1 p-1 rounded-full bg-black/70 text-white text-xs';
+          rmBtn.textContent = '✕';
+          rmBtn.addEventListener('click', function () {
+            state.composer.attachments.splice(idx, 1);
+            renderComposerUI();
+          });
+          div.appendChild(rmBtn);
+          attBox.appendChild(div);
+        });
+
+        // Composer Badges
+        const badgeBox = document.getElementById('composer-badges');
+        badgeBox.innerHTML = '';
+        if (state.composer.reminder) {
+          const rSpan = document.createElement('span');
+          rSpan.className = 'px-2 py-0.5 rounded-full text-xs bg-amber-500/20 text-amber-600 dark:text-amber-300';
+          rSpan.textContent = '⏰ ' + state.composer.reminder.fireAt.replace('T', ' ');
+          badgeBox.appendChild(rSpan);
+        }
+        state.composer.labels.forEach(function (lb) {
+          const lSpan = document.createElement('span');
+          lSpan.className = 'px-2 py-0.5 rounded-full text-xs bg-black/10 dark:bg-white/10';
+          lSpan.textContent = '#' + lb;
+          badgeBox.appendChild(lSpan);
+        });
+      }
+
+      function renderComposerListItems() {
+        const wrap = document.getElementById('composer-list-items');
+        wrap.innerHTML = '';
+        state.composer.items.forEach(function (item, idx) {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 ' + (item.indented ? 'pl-5' : '');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = item.checked;
+          cb.className = 'rounded accent-amber-400';
+          cb.addEventListener('change', function () {
+            item.checked = cb.checked;
+            renderComposerListItems();
+          });
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.value = item.text;
+          inp.className = 'flex-1 bg-transparent text-sm outline-none ' + (item.checked ? 'line-through opacity-60' : '');
+          inp.addEventListener('input', function () { item.text = inp.value; });
+
+          const indentBtn = document.createElement('button');
+          indentBtn.type = 'button';
+          indentBtn.title = 'Toggle Subtask Indent';
+          indentBtn.className = 'text-xs px-1.5 py-0.5 rounded opacity-60 hover:opacity-100 bg-black/5 dark:bg-white/10 font-mono';
+          indentBtn.textContent = item.indented ? '<<' : '>>';
+          indentBtn.addEventListener('click', function () {
+            item.indented = !item.indented;
+            renderComposerListItems();
+          });
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'text-xs opacity-50 hover:opacity-100 px-1';
+          delBtn.textContent = '✕';
+          delBtn.addEventListener('click', function () {
+            state.composer.items.splice(idx, 1);
+            renderComposerListItems();
+          });
+
+          row.appendChild(cb);
+          row.appendChild(inp);
+          row.appendChild(indentBtn);
+          row.appendChild(delBtn);
+          wrap.appendChild(row);
+        });
+      }
+
+      function commitAndResetComposer() {
+        const title = document.getElementById('composer-title').value.trim();
+        const text = document.getElementById('composer-text').value.trim();
+        const pendingItemInput = document.getElementById('composer-new-item-input');
+        if (pendingItemInput && pendingItemInput.value.trim()) {
+          state.composer.items.push({
+            id: uid('item'),
+            parentId: 'composer',
+            parentItemId: null,
+            text: pendingItemInput.value.trim(),
+            checked: false,
+            indented: false,
+            sort: (state.composer.items.length + 1) * 1000
+          });
+          pendingItemInput.value = '';
+        }
+
+        const hasContent = Boolean(title || text || state.composer.items.length > 0 || state.composer.attachments.length > 0);
+        if (hasContent) {
+          const maxSort = state.notes.reduce(function (m, n) { return Math.max(m, n.sortOrder || 0); }, 1000);
+          const nowIso = new Date().toISOString();
+          const newId = uid('notes/keep');
+          const newNote = {
+            id: newId,
+            type: state.composer.type,
+            title: title,
+            text: state.composer.type === 'TEXT' ? text : '',
+            items: state.composer.type === 'LIST' ? state.composer.items.map(function (it, i) {
+              return Object.assign({}, it, { parentId: newId, sort: (state.composer.items.length - i) * 1000 });
+            }) : [],
+            color: state.composer.color,
+            pinned: state.composer.pinned,
+            archived: false,
+            trashed: false,
+            trashedAt: null,
+            labels: state.composer.labels.slice(),
+            attachments: state.composer.attachments.slice(),
+            reminder: state.composer.reminder ? Object.assign({}, state.composer.reminder) : null,
+            sortOrder: maxSort + 1000,
+            timestamps: { created: nowIso, updated: nowIso, userEdited: nowIso },
+            dirty: false
+          };
+          state.notes.unshift(newNote);
+          persistState('CREATE_NOTE');
+        }
+
+        state.composer = {
+          expanded: false,
+          type: 'TEXT',
+          title: '',
+          text: '',
+          items: [],
+          color: 'DEFAULT',
+          pinned: false,
+          labels: [],
+          attachments: [],
+          reminder: null
+        };
+        document.getElementById('composer-color-popover').classList.add('hidden');
+        document.getElementById('composer-label-popover').classList.add('hidden');
+        document.getElementById('composer-reminder-popover').classList.add('hidden');
+        renderAll();
+      }
+
+      // =========================================================================
+      // 9. NOTE MUTATION CONTROLLERS
+      // =========================================================================
+      function findNote(noteId) {
+        return state.notes.find(function (n) { return n.id === noteId; });
+      }
+
+      function togglePinNote(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        note.pinned = !note.pinned;
+        if (note.pinned && note.archived) {
+          note.archived = false;
+        }
+        note.timestamps.updated = new Date().toISOString();
+        persistState('TOGGLE_PIN');
+        renderAll();
+      }
+
+      function toggleArchiveNote(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        pushUndoSnapshot(note.archived ? 'Note unarchived' : 'Note archived');
+        note.archived = !note.archived;
+        if (note.archived) note.pinned = false;
+        note.timestamps.updated = new Date().toISOString();
+        persistState('TOGGLE_ARCHIVE');
+        renderAll();
+      }
+
+      function moveNoteToTrash(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        pushUndoSnapshot('Note moved to Trash');
+        note.trashed = true;
+        note.pinned = false;
+        note.trashedAt = new Date().toISOString();
+        persistState('MOVE_TO_TRASH');
+        renderAll();
+      }
+
+      function restoreNoteFromTrash(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        note.trashed = false;
+        note.trashedAt = null;
+        persistState('RESTORE_FROM_TRASH');
+        renderAll();
+      }
+
+      function hardDeleteNote(noteId) {
+        state.notes = state.notes.filter(function (n) { return n.id !== noteId; });
+        persistState('HARD_DELETE_NOTE');
+        renderAll();
+      }
+
+      function cycleNoteColor(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        const keys = Object.keys(KEEP_COLORS);
+        const nextIdx = (keys.indexOf(note.color) + 1) % keys.length;
+        note.color = keys[nextIdx];
+        note.timestamps.updated = new Date().toISOString();
+        persistState('CYCLE_COLOR');
+        renderAll();
+      }
+
+      function toggleNoteType(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        if (note.type === 'TEXT') {
+          note.items = convertTextToItems(note.text || note.title || 'New item', note.id);
+          note.text = '';
+          note.type = 'LIST';
+        } else {
+          note.text = convertItemsToText(note.items);
+          note.items = [];
+          note.type = 'TEXT';
+        }
+        note.timestamps.userEdited = new Date().toISOString();
+        persistState('CONVERT_NODE_TYPE');
+        renderAll();
+      }
+
+      function toggleChecklistItemOnCard(noteId, itemId) {
+        const note = findNote(noteId);
+        if (!note || !note.items) return;
+        const sorted = note.items.slice().sort(function (a, b) { return b.sort - a.sort; });
+        const targetIdx = sorted.findIndex(function (i) { return i.id === itemId; });
+        if (targetIdx === -1) return;
+        const target = sorted[targetIdx];
+        target.checked = !target.checked;
+
+        // Parent-child cascade: if parent is checked/unchecked, cascade to indented children directly below
+        if (!target.indented) {
+          for (let i = targetIdx + 1; i < sorted.length; i++) {
+            if (sorted[i].indented) {
+              sorted[i].checked = target.checked;
+            } else {
+              break;
+            }
+          }
+        }
+        note.timestamps.userEdited = new Date().toISOString();
+        persistState('TOGGLE_LIST_ITEM');
+        renderAll();
+      }
+
+      function swapNoteSortOrder(idA, idB) {
+        const noteA = findNote(idA);
+        const noteB = findNote(idB);
+        if (!noteA || !noteB) return;
+        const tmp = noteA.sortOrder;
+        noteA.sortOrder = noteB.sortOrder;
+        noteB.sortOrder = tmp;
+        persistState('DRAG_REORDER');
+        renderAll();
+      }
+
+      function toggleSelectNote(noteId) {
+        if (state.selectedNoteIds.has(noteId)) {
+          state.selectedNoteIds.delete(noteId);
+        } else {
+          state.selectedNoteIds.add(noteId);
+        }
+        renderAll();
+      }
+
+      // =========================================================================
+      // 10. EXPANDED MODAL EDITOR CONTROLLER
+      // =========================================================================
+      function openNoteModal(noteId) {
+        const note = findNote(noteId);
+        if (!note) return;
+        state.activeModalNoteId = noteId;
+        const backdrop = document.getElementById('note-modal-backdrop');
+        backdrop.classList.remove('hidden');
+        renderActiveModal();
+      }
+
+      function renderActiveModal() {
+        const note = findNote(state.activeModalNoteId);
+        if (!note) return;
+        const card = document.getElementById('note-modal-card');
+        const theme = getCardThemeStyle(note.color);
+        card.style.backgroundColor = theme.bg;
+        card.style.borderColor = theme.border;
+
+        document.getElementById('modal-title-input').value = note.title || '';
+        const textInput = document.getElementById('modal-text-input');
+        const listWrap = document.getElementById('modal-list-wrapper');
+
+        if (note.type === 'LIST') {
+          textInput.classList.add('hidden');
+          listWrap.classList.remove('hidden');
+          renderModalChecklist(note);
+        } else {
+          textInput.classList.remove('hidden');
+          listWrap.classList.add('hidden');
+          textInput.value = note.text || '';
+        }
+
+        // Render Modal Attachments
+        const attBox = document.getElementById('modal-attachments');
+        attBox.innerHTML = '';
+        (note.attachments || []).forEach(function (att, idx) {
+          const wrap = document.createElement('div');
+          wrap.className = 'relative rounded-xl overflow-hidden border border-black/10';
+          wrap.innerHTML = '<img src="' + att.dataUrl + '" class="w-full h-36 object-cover" alt="Modal Attachment" />';
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'absolute top-1.5 right-1.5 px-2 py-0.5 rounded bg-black/75 text-white text-xs';
+          delBtn.textContent = 'Remove';
+          delBtn.addEventListener('click', function () {
+            note.attachments.splice(idx, 1);
+            persistState('REMOVE_ATTACHMENT');
+            renderActiveModal();
+            renderBoard();
+          });
+          wrap.appendChild(delBtn);
+          attBox.appendChild(wrap);
+        });
+
+        // Render Color Swatches in Modal
+        const swatchBox = document.getElementById('modal-color-swatches');
+        swatchBox.innerHTML = '';
+        Object.keys(KEEP_COLORS).forEach(function (cKey) {
+          const cObj = KEEP_COLORS[cKey];
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.title = cObj.label;
+          btn.className = 'w-6 h-6 rounded-full border transition transform hover:scale-110 ' + (note.color === cKey ? 'ring-2 ring-amber-400 scale-110' : 'border-black/20 dark:border-white/20');
+          btn.style.backgroundColor = state.darkMode ? cObj.darkBg : cObj.lightBg;
+          btn.addEventListener('click', function () {
+            note.color = cKey;
+            persistState('SET_MODAL_COLOR');
+            renderActiveModal();
+            renderBoard();
+          });
+          swatchBox.appendChild(btn);
+        });
+
+        // Render Label Toggles in Modal
+        const labelBox = document.getElementById('modal-label-toggles');
+        labelBox.innerHTML = '';
+        state.labels.forEach(function (lb) {
+          const active = (note.labels || []).indexOf(lb) !== -1;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'px-2.5 py-1 rounded-full text-xs font-medium border transition ' + (active ? 'bg-amber-400 text-slate-950 border-amber-500' : 'bg-black/5 dark:bg-white/10 border-transparent');
+          btn.textContent = '#' + lb;
+          btn.addEventListener('click', function () {
+            note.labels = note.labels || [];
+            const idx = note.labels.indexOf(lb);
+            if (idx === -1) note.labels.push(lb);
+            else note.labels.splice(idx, 1);
+            persistState('TOGGLE_MODAL_LABEL');
+            renderActiveModal();
+            renderSidebarAndCounts();
+            renderBoard();
+          });
+          labelBox.appendChild(btn);
+        });
+
+        // Reminder Input
+        const remInput = document.getElementById('modal-reminder-input');
+        remInput.value = note.reminder ? note.reminder.fireAt : '';
+
+        // Timestamp
+        const editedDate = new Date(note.timestamps.userEdited || note.timestamps.updated);
+        document.getElementById('modal-timestamp-label').textContent = 'Edited ' + editedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      function renderModalChecklist(note) {
+        const uncheckedBox = document.getElementById('modal-unchecked-items');
+        const checkedBox = document.getElementById('modal-checked-items');
+        const checkedSec = document.getElementById('modal-checked-section');
+        uncheckedBox.innerHTML = '';
+        checkedBox.innerHTML = '';
+
+        const sorted = (note.items || []).slice().sort(function (a, b) { return b.sort - a.sort; });
+        const unchecked = sorted.filter(function (i) { return !i.checked; });
+        const checked = sorted.filter(function (i) { return i.checked; });
+
+        function createModalItemRow(item) {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 ' + (item.indented ? 'pl-6' : '');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = item.checked;
+          cb.className = 'rounded accent-amber-400';
+          cb.addEventListener('change', function () {
+            item.checked = cb.checked;
+            persistState('MODAL_ITEM_CHECK');
+            renderModalChecklist(note);
+            renderBoard();
+          });
+
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.value = item.text;
+          inp.className = 'flex-1 bg-transparent text-sm outline-none ' + (item.checked ? 'line-through opacity-60' : '');
+          inp.addEventListener('input', function () {
+            item.text = inp.value;
+            note.timestamps.userEdited = new Date().toISOString();
+            persistState('MODAL_ITEM_EDIT');
+            renderBoard();
+          });
+
+          const indentBtn = document.createElement('button');
+          indentBtn.type = 'button';
+          indentBtn.className = 'px-1.5 py-0.5 rounded text-[11px] font-mono bg-black/5 dark:bg-white/10';
+          indentBtn.textContent = item.indented ? '<<' : '>>';
+          indentBtn.addEventListener('click', function () {
+            item.indented = !item.indented;
+            persistState('MODAL_ITEM_INDENT');
+            renderModalChecklist(note);
+            renderBoard();
+          });
+
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'px-1.5 text-xs opacity-60 hover:opacity-100';
+          delBtn.textContent = '✕';
+          delBtn.addEventListener('click', function () {
+            note.items = note.items.filter(function (x) { return x.id !== item.id; });
+            persistState('MODAL_ITEM_DELETE');
+            renderModalChecklist(note);
+            renderBoard();
+          });
+
+          row.appendChild(cb);
+          row.appendChild(inp);
+          row.appendChild(indentBtn);
+          row.appendChild(delBtn);
+          return row;
+        }
+
+        unchecked.forEach(function (it) { uncheckedBox.appendChild(createModalItemRow(it)); });
+        checked.forEach(function (it) { checkedBox.appendChild(createModalItemRow(it)); });
+        checkedSec.classList.toggle('hidden', checked.length === 0);
+        document.getElementById('modal-checked-header').textContent = checked.length + ' Checked item' + (checked.length > 1 ? 's' : '');
+      }
+
+      function closeNoteModal() {
+        state.activeModalNoteId = null;
+        document.getElementById('note-modal-backdrop').classList.add('hidden');
+        renderAll();
+      }
+
+      // =========================================================================
+      // 11. HTML5 CANVAS FREEHAND INK STUDIO
+      // =========================================================================
+      let drawCtx = null;
+      let isDrawingStroke = false;
+      let brushColor = '#f59e0b';
+
+      function initDrawingCanvas() {
+        const canvas = document.getElementById('drawing-canvas');
+        if (!canvas) return;
+        drawCtx = canvas.getContext('2d');
+        clearDrawingCanvas();
+
+        function getCoords(e) {
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width / rect.width;
+          const scaleY = canvas.height / rect.height;
+          const clientX = e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches && e.touches[0] ? e.touches[0].clientY : e.clientY;
+          return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+          };
+        }
+
+        function startStroke(e) {
+          isDrawingStroke = true;
+          const pt = getCoords(e);
+          drawCtx.beginPath();
+          drawCtx.moveTo(pt.x, pt.y);
+        }
+
+        function moveStroke(e) {
+          if (!isDrawingStroke) return;
+          if (e.cancelable) e.preventDefault();
+          const pt = getCoords(e);
+          const size = Number(document.getElementById('draw-size-select').value) || 6;
+          drawCtx.lineCap = 'round';
+          drawCtx.lineJoin = 'round';
+          drawCtx.lineWidth = size;
+          drawCtx.strokeStyle = brushColor;
+          drawCtx.globalAlpha = size > 10 ? 0.45 : 1.0;
+          drawCtx.lineTo(pt.x, pt.y);
+          drawCtx.stroke();
+        }
+
+        function endStroke() {
+          isDrawingStroke = false;
+          drawCtx.globalAlpha = 1.0;
+        }
+
+        canvas.addEventListener('mousedown', startStroke);
+        canvas.addEventListener('mousemove', moveStroke);
+        window.addEventListener('mouseup', endStroke);
+        canvas.addEventListener('touchstart', startStroke, { passive: false });
+        canvas.addEventListener('touchmove', moveStroke, { passive: false });
+        window.addEventListener('touchend', endStroke);
+      }
+
+      function clearDrawingCanvas() {
+        const canvas = document.getElementById('drawing-canvas');
+        if (!canvas || !drawCtx) return;
+        drawCtx.fillStyle = '#1e1f23';
+        drawCtx.fillRect(0, 0, canvas.width, canvas.height);
+        // Subtle dot grid
+        drawCtx.fillStyle = 'rgba(255,255,255,0.08)';
+        for (let x = 24; x < canvas.width; x += 24) {
+          for (let y = 24; y < canvas.height; y += 24) {
+            drawCtx.fillRect(x, y, 2, 2);
+          }
+        }
+      }
+
+      function openDrawingStudio(targetMode) {
+        state.drawingTarget = targetMode;
+        clearDrawingCanvas();
+        document.getElementById('draw-ocr-label-input').value = '';
+        document.getElementById('drawing-modal-backdrop').classList.remove('hidden');
+      }
+
+      // =========================================================================
+      // 12. EVENT LISTENERS & INITIALIZATION
+      // =========================================================================
+      function bindEvents() {
+        // Sidebar Toggle
+        document.getElementById('btn-toggle-sidebar').addEventListener('click', function () {
+          state.sidebarOpen = !state.sidebarOpen;
+          document.getElementById('sidebar-nav').classList.toggle('hidden', !state.sidebarOpen);
+          scheduleMasonryLayout();
+        });
+
+        // Brand Home Reset
+        document.getElementById('brand-home-trigger').addEventListener('click', function () {
+          state.activeNav = 'NOTES';
+          state.searchQuery = '';
+          document.getElementById('search-input').value = '';
+          renderAll();
+        });
+
+        // Navigation Items
+        document.querySelectorAll('.nav-item').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            state.activeNav = btn.getAttribute('data-nav');
+            state.selectedNoteIds.clear();
+            renderAll();
+          });
+        });
+
+        // Search Input & Facets
+        const searchInput = document.getElementById('search-input');
+        const clearSearchBtn = document.getElementById('btn-clear-search');
+        searchInput.addEventListener('input', function () {
+          state.searchQuery = searchInput.value;
+          clearSearchBtn.classList.toggle('hidden', !state.searchQuery);
+          renderBoard();
+        });
+        clearSearchBtn.addEventListener('click', function () {
+          state.searchQuery = '';
+          searchInput.value = '';
+          clearSearchBtn.classList.add('hidden');
+          renderBoard();
+        });
+
+        document.getElementById('btn-toggle-filters').addEventListener('click', function () {
+          document.getElementById('search-facet-panel').classList.toggle('hidden');
+        });
+
+        document.querySelectorAll('.facet-type-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            state.searchFilters.type = btn.getAttribute('data-facet-type');
+            document.querySelectorAll('.facet-type-btn').forEach(function (b) {
+              const active = b.getAttribute('data-facet-type') === state.searchFilters.type;
+              b.className = 'facet-type-btn px-3 py-1.5 rounded-lg text-xs font-medium ' + (active ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 dark:bg-[#35363a]');
+            });
+            renderBoard();
+          });
+        });
+
+        // Populate Search Color Swatches
+        const facetSwatches = document.getElementById('facet-color-swatches');
+        Object.keys(KEEP_COLORS).forEach(function (cKey) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.title = KEEP_COLORS[cKey].label;
+          btn.className = 'w-6 h-6 rounded-full border border-slate-400 transition transform hover:scale-110';
+          btn.style.backgroundColor = KEEP_COLORS[cKey].swatch;
+          btn.addEventListener('click', function () {
+            state.searchFilters.color = state.searchFilters.color === cKey ? null : cKey;
+            renderBoard();
+          });
+          facetSwatches.appendChild(btn);
+        });
+
+        document.getElementById('btn-reset-facets').addEventListener('click', function () {
+          state.searchFilters.type = 'ALL';
+          state.searchFilters.color = null;
+          state.searchQuery = '';
+          searchInput.value = '';
+          document.getElementById('search-facet-panel').classList.add('hidden');
+          renderBoard();
+        });
+
+        // REA Telemetry Drawer Toggle
+        document.getElementById('btn-toggle-rea-inspector').addEventListener('click', function () {
+          state.reaInspectorOpen = !state.reaInspectorOpen;
+          document.getElementById('rea-inspector-drawer').classList.toggle('hidden', !state.reaInspectorOpen);
+          updateReaTelemetryUI();
+        });
+
+        // View Mode Toggle (Masonry Grid <-> Single Column List)
+        document.getElementById('btn-toggle-layout').addEventListener('click', function () {
+          state.viewMode = state.viewMode === 'MASONRY_GRID' ? 'SINGLE_COLUMN_LIST' : 'MASONRY_GRID';
+          persistState('TOGGLE_VIEW_MODE');
+          scheduleMasonryLayout();
+        });
+
+        // Theme Toggle
+        document.getElementById('btn-toggle-theme').addEventListener('click', function () {
+          state.darkMode = !state.darkMode;
+          persistState('TOGGLE_THEME');
+          renderAll();
+        });
+
+        // Batch Actions
+        document.getElementById('btn-batch-clear').addEventListener('click', function () {
+          state.selectedNoteIds.clear();
+          renderAll();
+        });
+        document.getElementById('btn-batch-select-all').addEventListener('click', function () {
+          getFilteredNotes().forEach(function (n) { state.selectedNoteIds.add(n.id); });
+          renderAll();
+        });
+        document.getElementById('btn-batch-pin').addEventListener('click', function () {
+          state.selectedNoteIds.forEach(function (id) {
+            const n = findNote(id);
+            if (n) n.pinned = !n.pinned;
+          });
+          state.selectedNoteIds.clear();
+          persistState('BATCH_PIN');
+          renderAll();
+        });
+        document.getElementById('btn-batch-archive').addEventListener('click', function () {
+          pushUndoSnapshot('Selected notes archived');
+          state.selectedNoteIds.forEach(function (id) {
+            const n = findNote(id);
+            if (n) { n.archived = true; n.pinned = false; }
+          });
+          state.selectedNoteIds.clear();
+          persistState('BATCH_ARCHIVE');
+          renderAll();
+        });
+        document.getElementById('btn-batch-trash').addEventListener('click', function () {
+          pushUndoSnapshot('Selected notes moved to Trash');
+          state.selectedNoteIds.forEach(function (id) {
+            const n = findNote(id);
+            if (n) { n.trashed = true; n.pinned = false; }
+          });
+          state.selectedNoteIds.clear();
+          persistState('BATCH_TRASH');
+          renderAll();
+        });
+
+        // Empty Trash Button
+        document.getElementById('btn-empty-trash').addEventListener('click', function () {
+          pushUndoSnapshot('Trash emptied');
+          state.notes = state.notes.filter(function (n) { return !n.trashed; });
+          persistState('EMPTY_TRASH');
+          renderAll();
+        });
+
+        // Quick-Capture Composer Controls
+        document.getElementById('composer-collapsed').addEventListener('click', function () {
+          expandComposer('TEXT');
+        });
+        document.getElementById('btn-quick-list').addEventListener('click', function (e) {
+          e.stopPropagation();
+          expandComposer('LIST');
+        });
+        document.getElementById('btn-quick-drawing').addEventListener('click', function (e) {
+          e.stopPropagation();
+          expandComposer('TEXT');
+          openDrawingStudio('COMPOSER');
+        });
+        document.getElementById('btn-quick-image').addEventListener('click', function (e) {
+          e.stopPropagation();
+          state.imageUploadTarget = 'COMPOSER';
+          expandComposer('TEXT');
+          document.getElementById('hidden-image-input').click();
+        });
+
+        document.getElementById('composer-title').addEventListener('input', function (e) {
+          state.composer.title = e.target.value;
+        });
+        document.getElementById('composer-text').addEventListener('input', function (e) {
+          state.composer.text = e.target.value;
+        });
+        document.getElementById('composer-pin-btn').addEventListener('click', function () {
+          state.composer.pinned = !state.composer.pinned;
+          document.getElementById('composer-pin-btn').classList.toggle('text-amber-400', state.composer.pinned);
+        });
+        document.getElementById('composer-toggle-type').addEventListener('click', function () {
+          if (state.composer.type === 'TEXT') {
+            state.composer.items = convertTextToItems(document.getElementById('composer-text').value, 'composer');
+            state.composer.type = 'LIST';
+          } else {
+            state.composer.text = convertItemsToText(state.composer.items);
+            state.composer.type = 'TEXT';
+          }
+          renderComposerUI();
+        });
+
+        document.getElementById('composer-new-item-input').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && e.target.value.trim()) {
+            e.preventDefault();
+            state.composer.items.push({
+              id: uid('item'),
+              parentId: 'composer',
+              parentItemId: null,
+              text: e.target.value.trim(),
+              checked: false,
+              indented: false,
+              sort: (state.composer.items.length + 1) * 1000
+            });
+            e.target.value = '';
+            renderComposerListItems();
+          }
+        });
+
+        // Composer Color Swatches Popover
+        const compColorPop = document.getElementById('composer-color-popover');
+        Object.keys(KEEP_COLORS).forEach(function (cKey) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'w-6 h-6 rounded-full border border-slate-400';
+          b.style.backgroundColor = KEEP_COLORS[cKey].swatch;
+          b.addEventListener('click', function () {
+            state.composer.color = cKey;
+            renderComposerUI();
+          });
+          compColorPop.appendChild(b);
+        });
+        document.getElementById('composer-color-trigger').addEventListener('click', function () {
+          compColorPop.classList.toggle('hidden');
+        });
+
+        // Composer Label Popover
+        document.getElementById('composer-label-trigger').addEventListener('click', function () {
+          const pop = document.getElementById('composer-label-popover');
+          const opts = document.getElementById('composer-label-options');
+          opts.innerHTML = '';
+          state.labels.forEach(function (lb) {
+            const active = state.composer.labels.indexOf(lb) !== -1;
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'px-2.5 py-1 rounded-full text-xs font-medium ' + (active ? 'bg-amber-400 text-slate-950' : 'bg-black/10 dark:bg-white/10');
+            b.textContent = '#' + lb;
+            b.addEventListener('click', function () {
+              const idx = state.composer.labels.indexOf(lb);
+              if (idx === -1) state.composer.labels.push(lb);
+              else state.composer.labels.splice(idx, 1);
+              renderComposerUI();
+            });
+            opts.appendChild(b);
+          });
+          pop.classList.toggle('hidden');
+        });
+
+        // Composer Reminder Popover
+        document.getElementById('composer-reminder-trigger').addEventListener('click', function () {
+          document.getElementById('composer-reminder-popover').classList.toggle('hidden');
+        });
+        document.getElementById('composer-set-reminder-btn').addEventListener('click', function () {
+          const val = document.getElementById('composer-reminder-input').value;
+          if (val) {
+            state.composer.reminder = { fireAt: val, recurrence: 'NONE', completed: false };
+            renderComposerUI();
+          }
+        });
+        document.getElementById('composer-clear-reminder-btn').addEventListener('click', function () {
+          state.composer.reminder = null;
+          renderComposerUI();
+        });
+
+        document.getElementById('composer-drawing-trigger').addEventListener('click', function () {
+          openDrawingStudio('COMPOSER');
+        });
+        document.getElementById('composer-image-trigger').addEventListener('click', function () {
+          state.imageUploadTarget = 'COMPOSER';
+          document.getElementById('hidden-image-input').click();
+        });
+        document.getElementById('composer-save-btn').addEventListener('click', commitAndResetComposer);
+
+        // Image Upload Reader
+        document.getElementById('hidden-image-input').addEventListener('change', function (e) {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            const att = {
+              id: uid('blob'),
+              mimeType: file.type || 'image/png',
+              dataUrl: ev.target.result,
+              width: 600,
+              height: 400,
+              isDrawing: false,
+              extractedText: file.name.replace(/\.[^.]+$/, '')
+            };
+            if (state.imageUploadTarget === 'MODAL' && state.activeModalNoteId) {
+              const n = findNote(state.activeModalNoteId);
+              if (n) {
+                n.attachments = n.attachments || [];
+                n.attachments.push(att);
+                persistState('ATTACH_IMAGE_MODAL');
+                renderActiveModal();
+                renderBoard();
+              }
+            } else {
+              state.composer.attachments.push(att);
+              renderComposerUI();
+            }
+          };
+          reader.readAsDataURL(file);
+          e.target.value = '';
+        });
+
+        // Expanded Modal Events
+        document.getElementById('note-modal-backdrop').addEventListener('click', function (e) {
+          if (e.target.id === 'note-modal-backdrop') closeNoteModal();
+        });
+        document.getElementById('modal-close-btn').addEventListener('click', closeNoteModal);
+        document.getElementById('modal-title-input').addEventListener('input', function (e) {
+          const n = findNote(state.activeModalNoteId);
+          if (n) {
+            n.title = e.target.value;
+            n.timestamps.userEdited = new Date().toISOString();
+            persistState('MODAL_TITLE_EDIT');
+            renderBoard();
+          }
+        });
+        document.getElementById('modal-text-input').addEventListener('input', function (e) {
+          const n = findNote(state.activeModalNoteId);
+          if (n) {
+            n.text = e.target.value;
+            n.timestamps.userEdited = new Date().toISOString();
+            persistState('MODAL_TEXT_EDIT');
+            renderBoard();
+          }
+        });
+        document.getElementById('modal-new-item-input').addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && e.target.value.trim()) {
+            e.preventDefault();
+            const n = findNote(state.activeModalNoteId);
+            if (n) {
+              n.items = n.items || [];
+              n.items.push({
+                id: uid('item'),
+                parentId: n.id,
+                parentItemId: null,
+                text: e.target.value.trim(),
+                checked: false,
+                indented: false,
+                sort: (n.items.length + 1) * 1000
+              });
+              e.target.value = '';
+              persistState('MODAL_ADD_LIST_ITEM');
+              renderModalChecklist(n);
+              renderBoard();
+            }
+          }
+        });
+        document.getElementById('modal-pin-btn').addEventListener('click', function () {
+          if (state.activeModalNoteId) {
+            togglePinNote(state.activeModalNoteId);
+            renderActiveModal();
+          }
+        });
+        document.getElementById('modal-toggle-type-btn').addEventListener('click', function () {
+          if (state.activeModalNoteId) {
+            toggleNoteType(state.activeModalNoteId);
+            renderActiveModal();
+          }
+        });
+        document.getElementById('modal-draw-btn').addEventListener('click', function () {
+          openDrawingStudio('MODAL');
+        });
+        document.getElementById('modal-duplicate-btn').addEventListener('click', function () {
+          const orig = findNote(state.activeModalNoteId);
+          if (!orig) return;
+          const copy = cloneDeep(orig);
+          copy.id = uid('notes/keep');
+          copy.title = (copy.title || 'Note') + ' (Copy)';
+          copy.sortOrder = (orig.sortOrder || 1000) + 500;
+          state.notes.unshift(copy);
+          persistState('DUPLICATE_NOTE');
+          closeNoteModal();
+        });
+        document.getElementById('modal-archive-btn').addEventListener('click', function () {
+          if (state.activeModalNoteId) {
+            toggleArchiveNote(state.activeModalNoteId);
+            closeNoteModal();
+          }
+        });
+        document.getElementById('modal-trash-btn').addEventListener('click', function () {
+          if (state.activeModalNoteId) {
+            moveNoteToTrash(state.activeModalNoteId);
+            closeNoteModal();
+          }
+        });
+        document.getElementById('modal-reminder-input').addEventListener('change', function (e) {
+          const n = findNote(state.activeModalNoteId);
+          if (n) {
+            n.reminder = e.target.value ? { fireAt: e.target.value, recurrence: 'NONE', completed: false } : null;
+            persistState('MODAL_SET_REMINDER');
+            renderBoard();
+            renderSidebarAndCounts();
+          }
+        });
+        document.getElementById('modal-clear-reminder-btn').addEventListener('click', function () {
+          const n = findNote(state.activeModalNoteId);
+          if (n) {
+            n.reminder = null;
+            document.getElementById('modal-reminder-input').value = '';
+            persistState('MODAL_CLEAR_REMINDER');
+            renderBoard();
+            renderSidebarAndCounts();
+          }
+        });
+
+        // Drawing Studio Events
+        document.querySelectorAll('.draw-color-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            brushColor = btn.getAttribute('data-brush-color');
+            document.querySelectorAll('.draw-color-btn').forEach(function (b) { b.classList.remove('ring-2', 'ring-amber-400'); });
+            btn.classList.add('ring-2', 'ring-amber-400');
+          });
+        });
+        document.getElementById('btn-draw-clear').addEventListener('click', clearDrawingCanvas);
+        document.getElementById('btn-draw-cancel').addEventListener('click', function () {
+          document.getElementById('drawing-modal-backdrop').classList.add('hidden');
+        });
+        document.getElementById('btn-draw-save').addEventListener('click', function () {
+          const canvas = document.getElementById('drawing-canvas');
+          const ocrTag = document.getElementById('draw-ocr-label-input').value.trim() || 'Freehand Sketch';
+          const att = {
+            id: uid('drawing'),
+            mimeType: 'image/png',
+            dataUrl: canvas.toDataURL('image/png'),
+            width: canvas.width,
+            height: canvas.height,
+            isDrawing: true,
+            extractedText: ocrTag
+          };
+          if (state.drawingTarget === 'MODAL' && state.activeModalNoteId) {
+            const n = findNote(state.activeModalNoteId);
+            if (n) {
+              n.attachments = n.attachments || [];
+              n.attachments.push(att);
+              persistState('SAVE_DRAWING_TO_MODAL');
+              renderActiveModal();
+              renderBoard();
+            }
+          } else {
+            state.composer.attachments.push(att);
+            renderComposerUI();
+          }
+          document.getElementById('drawing-modal-backdrop').classList.add('hidden');
+        });
+
+        // Label Manager Modal
+        function renderLabelManagerList() {
+          const list = document.getElementById('label-manager-list');
+          list.innerHTML = '';
+          state.labels.forEach(function (lb, idx) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#202124]';
+            const span = document.createElement('span');
+            span.className = 'text-sm font-medium';
+            span.textContent = '#' + lb;
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'text-xs text-rose-500 hover:underline';
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', function () {
+              state.labels.splice(idx, 1);
+              state.notes.forEach(function (n) {
+                if (n.labels) n.labels = n.labels.filter(function (x) { return x !== lb; });
+              });
+              persistState('DELETE_LABEL');
+              renderLabelManagerList();
+              renderAll();
+            });
+            row.appendChild(span);
+            row.appendChild(delBtn);
+            list.appendChild(row);
+          });
+        }
+
+        document.getElementById('btn-open-label-manager').addEventListener('click', function () {
+          renderLabelManagerList();
+          document.getElementById('label-modal-backdrop').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-label-modal').addEventListener('click', function () {
+          document.getElementById('label-modal-backdrop').classList.add('hidden');
+        });
+        document.getElementById('btn-create-label').addEventListener('click', function () {
+          const inp = document.getElementById('new-label-name-input');
+          const val = inp.value.trim().replace(/^#/, '');
+          if (val && state.labels.indexOf(val) === -1) {
+            state.labels.push(val);
+            inp.value = '';
+            persistState('CREATE_LABEL');
+            renderLabelManagerList();
+            renderAll();
+          }
+        });
+
+        // Export / Import Vault Modal
+        document.getElementById('btn-open-export-modal').addEventListener('click', function () {
+          document.getElementById('export-modal-backdrop').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-export-modal').addEventListener('click', function () {
+          document.getElementById('export-modal-backdrop').classList.add('hidden');
+        });
+        document.getElementById('btn-download-json').addEventListener('click', function () {
+          const blob = new Blob([JSON.stringify({ notes: state.notes, labels: state.labels }, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'keep-cleanroom-vault.json';
+          a.click();
+        });
+        document.getElementById('btn-download-markdown').addEventListener('click', function () {
+          const md = state.notes.map(function (n) {
+            const body = n.type === 'LIST'
+              ? (n.items || []).map(function (i) { return (i.indented ? '  ' : '') + '- [' + (i.checked ? 'x' : ' ') + '] ' + i.text; }).join('\n')
+              : (n.text || '');
+            return '---\nid: ' + n.id + '\ncolor: ' + n.color + '\npinned: ' + n.pinned + '\nlabels: [' + (n.labels || []).join(', ') + ']\n---\n# ' + (n.title || 'Untitled') + '\n\n' + body + '\n';
+          }).join('\n\n');
+          const blob = new Blob([md], { type: 'text/markdown' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'keep-vault-export.md';
+          a.click();
+        });
+        document.getElementById('import-json-input').addEventListener('change', function (e) {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            try {
+              const parsed = JSON.parse(ev.target.result);
+              if (Array.isArray(parsed.notes)) {
+                pushUndoSnapshot('Vault imported');
+                state.notes = parsed.notes;
+                if (Array.isArray(parsed.labels)) state.labels = parsed.labels;
+                persistState('IMPORT_JSON_VAULT');
+                renderAll();
+                document.getElementById('export-modal-backdrop').classList.add('hidden');
+              }
+            } catch (err) {
+              showUndoToast('Invalid JSON file');
+            }
+          };
+          reader.readAsText(file);
+        });
+
+        // Undo Action
+        document.getElementById('btn-undo-action').addEventListener('click', function () {
+          const last = state.undoStack.pop();
+          if (last) {
+            state.notes = last.notes;
+            document.getElementById('undo-toast').classList.add('hidden');
+            persistState('UNDO_RESTORE');
+            renderAll();
+          }
+        });
+
+        // Global Keyboard Shortcuts (c = note, l = list, / = search, d = drawing, Esc = close/save)
+        window.addEventListener('keydown', function (e) {
+          const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+          const inInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+
+          if (e.key === 'Escape') {
+            if (state.activeModalNoteId) {
+              closeNoteModal();
+            } else if (!document.getElementById('drawing-modal-backdrop').classList.contains('hidden')) {
+              document.getElementById('drawing-modal-backdrop').classList.add('hidden');
+            } else if (state.composer.expanded) {
+              commitAndResetComposer();
+            } else if (state.selectedNoteIds.size > 0) {
+              state.selectedNoteIds.clear();
+              renderAll();
+            }
+            return;
+          }
+
+          if (inInput) return;
+
+          if (e.key === 'c') {
+            e.preventDefault();
+            expandComposer('TEXT');
+          } else if (e.key === 'l') {
+            e.preventDefault();
+            expandComposer('LIST');
+          } else if (e.key === '/') {
+            e.preventDefault();
+            document.getElementById('search-input').focus();
+          } else if (e.key === 'd') {
+            e.preventDefault();
+            expandComposer('TEXT');
+            openDrawingStudio('COMPOSER');
+          }
+        });
+
+        window.addEventListener('resize', scheduleMasonryLayout);
+      }
+
+      // Initialize App on Load
+      window.addEventListener('DOMContentLoaded', function () {
+        loadStateFromStorage();
+        initDrawingCanvas();
+        bindEvents();
+        renderAll();
+      });
+    })();
+  </script>
+</body>
+</html>
